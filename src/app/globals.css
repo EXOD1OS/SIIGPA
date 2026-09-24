@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  background-color: #0c0f17;
+  color: #e5e7eb;
+}
+
+* {
+  border-color: #262e40;
+}
+
+input,
+textarea,
+select {
+  background-color: #0c0f17;
+  border: 1px solid #262e40;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  color: #e5e7eb;
+  outline: none;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #3b82f6;
+}
+
+::placeholder {
+  color: #6b7280;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+  }
+  .print-area {
+    box-shadow: none !important;
+    border: none !important;
+  }
+}

@@ -1,0 +1,170 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  DOCENTE
+  UAP
+  DIRECCION_CARRERA
+  ADMINISTRADOR
+  CONSEJO_DEPARTAMENTAL
+}
+
+enum PlanifStatus {
+  BORRADOR
+  ENVIADO_A_REVISION
+  OBSERVADO
+  APROBADO_PEDAGOGICO
+  APROBADO_DISCIPLINAR
+  APROBADO_PLENO
+  ELEVADO_AL_CONSEJO
+  FINALIZADO
+}
+
+model Sede {
+  id        String    @id @default(uuid())
+  nombre    String
+  esCapital Boolean   @default(false)
+  carreras  Carrera[]
+}
+
+model Departamento {
+  id          String       @id @default(uuid())
+  nombre      String
+  carreras    Carrera[]
+  asignaturas Asignatura[]
+}
+
+model Carrera {
+  id                    String        @id @default(uuid())
+  departamentoId        String
+  sedeId                String
+  nombre                String
+  codigo                String
+  departamento          Departamento  @relation(fields: [departamentoId], references: [id])
+  sede                  Sede          @relation(fields: [sedeId], references: [id])
+  planes                PlanEstudio[]
+  directores            Usuario[]     @relation("DirectorCarrera")
+  asignaturasEvaluadas  Asignatura[]  @relation("CarreraEvaluadora")
+}
+
+model PlanEstudio {
+  id          String       @id @default(uuid())
+  carreraId   String
+  ordenanza   String
+  enfoque     String       @default("TRADICIONAL")
+  activo      Boolean      @default(true)
+  carrera     Carrera      @relation(fields: [carreraId], references: [id])
+  asignaturas Asignatura[]
+}
+
+model Asignatura {
+  id                         String          @id @default(uuid())
+  planEstudioId              String
+  departamentoRadicacionId   String
+  carreraEvaluadoraId        String?
+  nombre                     String
+  anoCursada                 Int
+  regimen                    String
+  creditoHorario             Int
+  contenidosMinimosOficiales String          @db.Text
+  planEstudio                PlanEstudio     @relation(fields: [planEstudioId], references: [id])
+  departamentoRadicacion     Departamento    @relation(fields: [departamentoRadicacionId], references: [id])
+  carreraEvaluadora          Carrera?        @relation("CarreraEvaluadora", fields: [carreraEvaluadoraId], references: [id])
+  planificaciones            Planificacion[]
+  asignacionesCatedra        AsignacionCatedra[]
+}
+
+model Usuario {
+  id                  String              @id @default(uuid())
+  email               String              @unique
+  dni                 String              @unique
+  passwordHash        String
+  mustChangePassword  Boolean             @default(false)
+  nombre              String
+  apellido            String
+  rol                 UserRole
+  carreraId           String?
+  carrera             Carrera?            @relation("DirectorCarrera", fields: [carreraId], references: [id])
+  planifResponsable   Planificacion[]     @relation("DocenteResponsable")
+  paadsDocente        PaadDocente[]
+  observaciones       ItemObservacion[]   @relation("AutorObservacion")
+  asignacionesCatedra AsignacionCatedra[]
+  createdAt           DateTime            @default(now())
+}
+
+// Equipo de cátedra: quién dicta qué asignatura, con qué categoría y ciclo
+// lectivo, independientemente de si ya existe una Planificacion para ese año.
+// El disparador de planificaciones usa este roster para crear en cascada la
+// Planificacion + PAAC + un PAAD por integrante.
+model AsignacionCatedra {
+  id            String     @id @default(uuid())
+  asignaturaId  String
+  cicloLectivo  Int
+  docenteId     String
+  categoria     String // TITULAR | ASOCIADO | ADJUNTO | JTP | AYUDANTE
+  esResponsable Boolean    @default(false)
+  asignatura    Asignatura @relation(fields: [asignaturaId], references: [id])
+  docente       Usuario    @relation(fields: [docenteId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@unique([asignaturaId, cicloLectivo, docenteId])
+}
+
+model Planificacion {
+  id                   String            @id @default(uuid())
+  asignaturaId         String
+  cicloLectivo         Int
+  docenteResponsableId String
+  estado               PlanifStatus      @default(BORRADOR)
+  datosPaac            Json
+  informePedagogico    Json?
+  informeDisciplinar   Json?
+  informeGeneral       Json?
+  numeroExpediente     String?
+  numeroResolucion     String?
+  fechaAprobacionCd    DateTime?
+  asignatura           Asignatura        @relation(fields: [asignaturaId], references: [id])
+  docenteResponsable   Usuario           @relation("DocenteResponsable", fields: [docenteResponsableId], references: [id])
+  paads                PaadDocente[]
+  observaciones        ItemObservacion[]
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  @@unique([asignaturaId, cicloLectivo])
+}
+
+model PaadDocente {
+  id              String        @id @default(uuid())
+  planificacionId String
+  docenteId       String
+  cargoEnCatedra  String
+  datosPaad       Json
+  estadoPresento  String        @default("NO_PRESENTO")
+  planificacion   Planificacion @relation(fields: [planificacionId], references: [id], onDelete: Cascade)
+  docente         Usuario       @relation(fields: [docenteId], references: [id])
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([planificacionId, docenteId])
+}
+
+model ItemObservacion {
+  id              String        @id @default(uuid())
+  planificacionId String
+  documentoTipo   String
+  docentePaadId   String?
+  campoPath       String
+  autorId         String
+  rolAutor        UserRole
+  mensaje         String        @db.Text
+  resuelto        Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  planificacion   Planificacion @relation(fields: [planificacionId], references: [id], onDelete: Cascade)
+  autor           Usuario       @relation("AutorObservacion", fields: [autorId], references: [id])
+}
