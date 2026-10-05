@@ -241,8 +241,7 @@ export const ESTADO_LABELS: Record<string, string> = {
 };
 
 export const ROL_LABELS: Record<string, string> = {
-  DOCENTE_AUXILIAR: 'Docente Auxiliar',
-  DOCENTE_RESPONSABLE: 'Docente Responsable',
+  DOCENTE: 'Docente',
   UAP: 'UAP',
   DIRECCION_CARRERA: 'Dirección de Carrera',
   CONSEJO_DEPARTAMENTAL: 'Consejo Departamental',

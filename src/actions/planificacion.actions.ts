@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma';
 import { PlanifStatus, UserRole } from '@prisma/client';
 import { hasRole } from '@/lib/roles';
 import { defaultPaad } from '@/lib/defaults';
+import { planificacionVisiblePara } from '@/lib/visibilidad';
 import type {
   PaacData,
   PaadData,
@@ -26,14 +27,23 @@ function revalidatePlanif(id: string) {
   revalidatePath('/planificaciones');
 }
 
+async function requirePlanificacionVisible(planificacionId: string, session: Awaited<ReturnType<typeof requireSession>>) {
+  const planif = await planificacionVisiblePara(session.user, planificacionId);
+  if (!planif) throw new Error('No encontrada o no autorizada.');
+  return planif;
+}
+
+function requireEstadoEditable(estado: string) {
+  if (!['BORRADOR', 'OBSERVADO'].includes(estado)) throw new Error('No editable en el estado actual.');
+}
+
 export async function actualizarPaac(planifId: string, datosPaac: PaacData) {
   const session = await requireSession();
-  const planif = await prisma.planificacion.findUnique({ where: { id: planifId } });
-  if (!planif) throw new Error('No encontrada.');
+  const planif = await requirePlanificacionVisible(planifId, session);
 
   const puedeEditar = planif.docenteResponsableId === session.user.id || session.user.rol === UserRole.ADMINISTRADOR;
   if (!puedeEditar) throw new Error('No autorizado.');
-  if (!['BORRADOR', 'OBSERVADO'].includes(planif.estado)) throw new Error('No editable en el estado actual.');
+  requireEstadoEditable(planif.estado);
 
   const updated = await prisma.planificacion.update({
     where: { id: planifId },
@@ -51,13 +61,17 @@ export async function guardarPaad(input: {
   datosPaad: PaadData;
 }) {
   const session = await requireSession();
-  const esPropio = session.user.id === input.docenteId;
+  const esPropio = session.user.id === input.docenteId && session.user.rol === UserRole.DOCENTE;
   const esAdmin = session.user.rol === UserRole.ADMINISTRADOR;
   if (!esPropio && !esAdmin) throw new Error('No autorizado.');
 
-  const planif = await prisma.planificacion.findUnique({ where: { id: input.planificacionId } });
-  if (!planif) throw new Error('No encontrada.');
-  if (!['BORRADOR', 'OBSERVADO'].includes(planif.estado)) throw new Error('No editable en el estado actual.');
+  const planif = await requirePlanificacionVisible(input.planificacionId, session);
+  requireEstadoEditable(planif.estado);
+
+  const paadExistente = await prisma.paadDocente.findUnique({
+    where: { planificacionId_docenteId: { planificacionId: input.planificacionId, docenteId: input.docenteId } },
+  });
+  if (!paadExistente) throw new Error('El docente no pertenece al equipo de esta planificación.');
 
   const paad = await prisma.paadDocente.upsert({
     where: { planificacionId_docenteId: { planificacionId: input.planificacionId, docenteId: input.docenteId } },
@@ -77,10 +91,12 @@ export async function guardarPaad(input: {
 
 export async function invitarDocenteEquipo(planificacionId: string, docenteId: string, cargoEnCatedra: string) {
   const session = await requireSession();
-  const planif = await prisma.planificacion.findUnique({ where: { id: planificacionId } });
-  if (!planif) throw new Error('No encontrada.');
+  const planif = await requirePlanificacionVisible(planificacionId, session);
   const autorizado = session.user.rol === UserRole.ADMINISTRADOR || planif.docenteResponsableId === session.user.id;
   if (!autorizado) throw new Error('No autorizado.');
+  requireEstadoEditable(planif.estado);
+  const docente = await prisma.usuario.findUnique({ where: { id: docenteId }, select: { rol: true } });
+  if (!docente || docente.rol !== UserRole.DOCENTE) throw new Error('El integrante debe tener rol Docente.');
 
   const paad = await prisma.paadDocente.upsert({
     where: { planificacionId_docenteId: { planificacionId, docenteId } },
@@ -105,8 +121,8 @@ export async function quitarDocenteEquipo(planificacionId: string, paadId: strin
   const paad = await prisma.paadDocente.findUnique({ where: { id: paadId } });
   if (!paad || paad.planificacionId !== planificacionId) throw new Error('No encontrado.');
 
-  const planif = await prisma.planificacion.findUnique({ where: { id: planificacionId } });
-  if (!planif) throw new Error('No encontrada.');
+  const planif = await requirePlanificacionVisible(planificacionId, session);
+  requireEstadoEditable(planif.estado);
   if (planif.docenteResponsableId === paad.docenteId) {
     throw new Error('No se puede quitar al Docente Responsable. Cambiá el responsable antes de quitarlo del equipo.');
   }
@@ -119,8 +135,10 @@ export async function cambiarResponsablePlanificacion(planificacionId: string, n
   const session = await requireSession();
   if (session.user.rol !== UserRole.ADMINISTRADOR) throw new Error('No autorizado.');
 
-  const planif = await prisma.planificacion.findUnique({ where: { id: planificacionId } });
-  if (!planif) throw new Error('No encontrada.');
+  const planif = await requirePlanificacionVisible(planificacionId, session);
+  requireEstadoEditable(planif.estado);
+  const nuevoResponsable = await prisma.usuario.findUnique({ where: { id: nuevoDocenteId }, select: { rol: true } });
+  if (!nuevoResponsable || nuevoResponsable.rol !== UserRole.DOCENTE) throw new Error('El responsable debe tener rol Docente.');
 
   await prisma.$transaction([
     prisma.paadDocente.upsert({
@@ -142,8 +160,7 @@ export async function cambiarResponsablePlanificacion(planificacionId: string, n
 
 export async function enviarARevision(planifId: string) {
   const session = await requireSession();
-  const planif = await prisma.planificacion.findUnique({ where: { id: planifId }, include: { paads: true } });
-  if (!planif) throw new Error('No encontrada.');
+  const planif = await requirePlanificacionVisible(planifId, session);
 
   const autorizado = session.user.rol === UserRole.ADMINISTRADOR || planif.docenteResponsableId === session.user.id;
   if (!autorizado) throw new Error('No autorizado.');
@@ -173,6 +190,12 @@ export async function agregarObservacion(input: {
     throw new Error('No autorizado.');
   }
 
+  const planif = await requirePlanificacionVisible(input.planificacionId, session);
+  if (planif.estado === 'BORRADOR') throw new Error('No se pueden observar planificaciones en borrador.');
+  if (input.documentoTipo === 'PAAD' && input.docentePaadId && !planif.paads.some((p) => p.id === input.docentePaadId)) {
+    throw new Error('El docente no pertenece al equipo de esta planificación.');
+  }
+
   const observacion = await prisma.itemObservacion.create({
     data: {
       planificacionId: input.planificacionId,
@@ -193,6 +216,11 @@ export async function resolverObservacion(observacionId: string) {
   const session = await requireSession();
   const obs = await prisma.itemObservacion.findUnique({ where: { id: observacionId } });
   if (!obs) throw new Error('No encontrada.');
+  const planif = await requirePlanificacionVisible(obs.planificacionId, session);
+  if (planif.estado !== 'OBSERVADO') throw new Error('Solo se pueden resolver observaciones de planificaciones observadas.');
+  if (planif.docenteResponsableId !== session.user.id && session.user.rol !== UserRole.ADMINISTRADOR) {
+    throw new Error('No autorizado.');
+  }
 
   const updated = await prisma.itemObservacion.update({
     where: { id: observacionId },
@@ -207,6 +235,11 @@ export async function marcarComoObservado(planifId: string) {
   const session = await requireSession();
   if (!hasRole(session.user.rol, [UserRole.UAP, UserRole.DIRECCION_CARRERA])) throw new Error('No autorizado.');
 
+  const planif = await requirePlanificacionVisible(planifId, session);
+  if (!['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR'].includes(planif.estado)) {
+    throw new Error('El estado actual no permite observar esta planificación.');
+  }
+
   const updated = await prisma.planificacion.update({
     where: { id: planifId },
     data: { estado: 'OBSERVADO' },
@@ -220,8 +253,10 @@ export async function registrarAprobacionPedagogica(planifId: string, dictamen: 
   const session = await requireSession();
   if (!hasRole(session.user.rol, [UserRole.UAP, UserRole.ADMINISTRADOR])) throw new Error('No autorizado.');
 
-  const planif = await prisma.planificacion.findUnique({ where: { id: planifId } });
-  if (!planif) throw new Error('No encontrada.');
+  const planif = await requirePlanificacionVisible(planifId, session);
+  if (!['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR'].includes(planif.estado)) {
+    throw new Error('El estado actual no permite registrar el dictamen pedagógico.');
+  }
 
   if (dictamen.dictamen === 'REQUIERE_CORRECCION') {
     const updated = await prisma.planificacion.update({
@@ -246,8 +281,10 @@ export async function registrarAprobacionDisciplinar(planifId: string, dictamen:
   const session = await requireSession();
   if (!hasRole(session.user.rol, [UserRole.DIRECCION_CARRERA, UserRole.ADMINISTRADOR])) throw new Error('No autorizado.');
 
-  const planif = await prisma.planificacion.findUnique({ where: { id: planifId } });
-  if (!planif) throw new Error('No encontrada.');
+  const planif = await requirePlanificacionVisible(planifId, session);
+  if (!['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR'].includes(planif.estado)) {
+    throw new Error('El estado actual no permite registrar el dictamen disciplinar.');
+  }
 
   if (dictamen.dictamen === 'REQUIERE_CORRECCION') {
     const updated = await prisma.planificacion.update({
@@ -274,8 +311,7 @@ export async function guardarInformeGeneral(planifId: string, informe: GeneralRe
     throw new Error('No autorizado.');
   }
 
-  const planif = await prisma.planificacion.findUnique({ where: { id: planifId } });
-  if (!planif) throw new Error('No encontrada.');
+  const planif = await requirePlanificacionVisible(planifId, session);
   if (planif.estado !== 'APROBADO_PLENO') throw new Error('El informe general solo puede elaborarse con aprobación plena.');
 
   const informeConAutoria: GeneralReportData = {
@@ -297,10 +333,13 @@ export async function elevarAlConsejo(planifId: string) {
   const session = await requireSession();
   if (!hasRole(session.user.rol, [UserRole.DIRECCION_CARRERA, UserRole.ADMINISTRADOR])) throw new Error('No autorizado.');
 
-  const planif = await prisma.planificacion.findUnique({ where: { id: planifId } });
-  if (!planif) throw new Error('No encontrada.');
+  const planif = await requirePlanificacionVisible(planifId, session);
   if (planif.estado !== 'APROBADO_PLENO') throw new Error('La planificación debe estar Aprobada Plena para elevarla.');
   if (!planif.informeGeneral) throw new Error('Falta elaborar el Informe General de PAAC junto a la UAP.');
+  const informeGeneral = planif.informeGeneral as unknown as GeneralReportData;
+  if (!informeGeneral.elaboradoPorUap || !informeGeneral.elaboradoPorDireccion) {
+    throw new Error('El Informe General debe contar con la participación de UAP y Dirección de Carrera.');
+  }
 
   const updated = await prisma.planificacion.update({
     where: { id: planifId },
@@ -315,9 +354,10 @@ export async function asignarExpediente(planifId: string, nroExpediente: string)
   const session = await requireSession();
   if (!hasRole(session.user.rol, [UserRole.CONSEJO_DEPARTAMENTAL, UserRole.ADMINISTRADOR])) throw new Error('No autorizado.');
 
-  const planif = await prisma.planificacion.findUnique({ where: { id: planifId } });
-  if (!planif) throw new Error('No encontrada.');
+  const planif = await requirePlanificacionVisible(planifId, session);
   if (planif.estado !== 'ELEVADO_AL_CONSEJO') throw new Error('La planificación debe estar elevada al consejo.');
+  if (!nroExpediente.trim()) throw new Error('El número de expediente es obligatorio.');
+  if (planif.numeroExpediente) throw new Error('Ya hay un expediente asignado.');
 
   const updated = await prisma.planificacion.update({
     where: { id: planifId },
@@ -332,10 +372,11 @@ export async function formalizarResolucion(planifId: string, nroResolucion: stri
   const session = await requireSession();
   if (!hasRole(session.user.rol, [UserRole.CONSEJO_DEPARTAMENTAL, UserRole.ADMINISTRADOR])) throw new Error('No autorizado.');
 
-  const planif = await prisma.planificacion.findUnique({ where: { id: planifId } });
-  if (!planif) throw new Error('No encontrada.');
+  const planif = await requirePlanificacionVisible(planifId, session);
   if (planif.estado !== 'ELEVADO_AL_CONSEJO') throw new Error('La planificación debe estar elevada al consejo.');
   if (!planif.numeroExpediente) throw new Error('Primero hay que asignar el número de expediente.');
+  if (!nroResolucion.trim()) throw new Error('El número de resolución es obligatorio.');
+  if (planif.numeroResolucion) throw new Error('Ya hay una resolución asignada.');
 
   const updated = await prisma.planificacion.update({
     where: { id: planifId },

@@ -188,7 +188,7 @@ async function main() {
       passwordHash,
       nombre: 'Mariana Soledad',
       apellido: 'Lastra',
-      rol: UserRole.DOCENTE_RESPONSABLE,
+      rol: UserRole.DOCENTE,
     },
   });
   const profNieto = await prisma.usuario.create({
@@ -198,14 +198,14 @@ async function main() {
       passwordHash,
       nombre: 'Alejandro Daniel',
       apellido: 'Nieto',
-      rol: UserRole.DOCENTE_AUXILIAR,
+      rol: UserRole.DOCENTE,
     },
   });
   const profTitular = await prisma.usuario.create({
-    data: { email: 'titular.prog@unlar.edu.ar', dni: '20000003', passwordHash, nombre: 'Juan', apellido: 'Pérez', rol: UserRole.DOCENTE_RESPONSABLE },
+    data: { email: 'titular.prog@unlar.edu.ar', dni: '20000003', passwordHash, nombre: 'Juan', apellido: 'Pérez', rol: UserRole.DOCENTE },
   });
   const profAuxiliar = await prisma.usuario.create({
-    data: { email: 'auxiliar.prog@unlar.edu.ar', dni: '20000004', passwordHash, nombre: 'María', apellido: 'Gómez', rol: UserRole.DOCENTE_AUXILIAR },
+    data: { email: 'auxiliar.prog@unlar.edu.ar', dni: '20000004', passwordHash, nombre: 'María', apellido: 'Gómez', rol: UserRole.DOCENTE },
   });
 
   // ---------------------------------------------------------------------------
@@ -590,8 +590,8 @@ async function main() {
   console.log('  direccion.isi@unlar.edu.ar / direccion.lsi@unlar.edu.ar / direccion.educacion@unlar.edu.ar (DIRECCION_CARRERA)');
   console.log('  uap@unlar.edu.ar (UAP)');
   console.log('  consejo.exactas@unlar.edu.ar (CONSEJO_DEPARTAMENTAL)');
-  console.log('  lastra.mariana@unlar.edu.ar (DOCENTE_RESPONSABLE, Análisis Matemático I - APROBADO_PLENO)');
-  console.log('  nieto.alejandro@unlar.edu.ar (DOCENTE_AUXILIAR)');
+  console.log('  lastra.mariana@unlar.edu.ar (DOCENTE, responsable de Análisis Matemático I - APROBADO_PLENO)');
+  console.log('  nieto.alejandro@unlar.edu.ar (DOCENTE, auxiliar)');
   console.log('  titular.prog@unlar.edu.ar / auxiliar.prog@unlar.edu.ar (Programación I - BORRADOR)');
 }
 

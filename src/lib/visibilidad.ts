@@ -1,4 +1,4 @@
-import { Prisma, UserRole } from '@prisma/client';
+import { PlanifStatus, Prisma, UserRole } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 const include = {
@@ -8,6 +8,8 @@ const include = {
 } satisfies Prisma.PlanificacionInclude;
 
 type SessionUser = { id: string; rol: UserRole; carreraId: string | null };
+
+const ESTADOS_VISIBLES_AL_CONSEJO: PlanifStatus[] = ['ELEVADO_AL_CONSEJO', 'FINALIZADO'];
 
 // La carrera responsable de evaluar disciplinarmente una asignatura es la propia,
 // salvo que esté explícitamente delegada a otra (caso de materias como Derecho
@@ -21,22 +23,24 @@ function carreraEvaluadoraWhere(carreraId: string): Prisma.PlanificacionWhereInp
   };
 }
 
-export async function planificacionesVisiblesPara(user: SessionUser) {
-  let where: Prisma.PlanificacionWhereInput = {};
-
+function planificacionesWherePara(user: SessionUser): Prisma.PlanificacionWhereInput {
   switch (user.rol) {
     case UserRole.ADMINISTRADOR:
     case UserRole.UAP:
+      return {};
     case UserRole.CONSEJO_DEPARTAMENTAL:
-      where = {};
-      break;
+      return { estado: { in: ESTADOS_VISIBLES_AL_CONSEJO } };
     case UserRole.DOCENTE:
-      where = { OR: [{ docenteResponsableId: user.id }, { paads: { some: { docenteId: user.id } } }] };
-      break;
+      return { OR: [{ docenteResponsableId: user.id }, { paads: { some: { docenteId: user.id } } }] };
     case UserRole.DIRECCION_CARRERA:
-      where = user.carreraId ? carreraEvaluadoraWhere(user.carreraId) : {};
-      break;
+      return user.carreraId ? carreraEvaluadoraWhere(user.carreraId) : { id: '__sin-carrera__' };
+    default:
+      return { id: '__rol-sin-acceso__' };
   }
+}
+
+export async function planificacionesVisiblesPara(user: SessionUser) {
+  const where = planificacionesWherePara(user);
 
   return prisma.planificacion.findMany({
     where,
@@ -46,24 +50,11 @@ export async function planificacionesVisiblesPara(user: SessionUser) {
 }
 
 export async function planificacionVisiblePara(user: SessionUser, id: string) {
-  const planif = await prisma.planificacion.findUnique({
-    where: { id },
+  return prisma.planificacion.findFirst({
+    where: { AND: [{ id }, planificacionesWherePara(user)] },
     include: {
       ...include,
       observaciones: { include: { autor: true }, orderBy: { createdAt: 'desc' } },
     },
   });
-  if (!planif) return null;
-
-  if (user.rol === UserRole.DOCENTE) {
-    const esResponsable = planif.docenteResponsableId === user.id;
-    const esIntegranteEquipo = planif.paads.some((p) => p.docenteId === user.id);
-    if (!esResponsable && !esIntegranteEquipo) return null;
-  }
-  if (user.rol === UserRole.DIRECCION_CARRERA) {
-    const carreraEvaluadoraId = planif.asignatura.carreraEvaluadoraId ?? planif.asignatura.planEstudio.carreraId;
-    if (carreraEvaluadoraId !== user.carreraId) return null;
-  }
-
-  return planif;
 }

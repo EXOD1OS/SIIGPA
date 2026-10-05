@@ -237,7 +237,7 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
           estado={planif.estado}
           rol={rol}
           esResponsable={esResponsable}
-          informeGeneralListo={!!informeGeneral}
+          informeGeneralListo={!!informeGeneral?.elaboradoPorUap && !!informeGeneral?.elaboradoPorDireccion}
           numeroExpediente={planif.numeroExpediente}
           numeroResolucion={planif.numeroResolucion}
         />

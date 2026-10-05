@@ -15,7 +15,7 @@ export function CrearUsuarioForm({ carreras }: { carreras: { id: string; nombre:
   const [apellido, setApellido] = useState('');
   const [email, setEmail] = useState('');
   const [dni, setDni] = useState('');
-  const [rol, setRol] = useState<UserRole>(UserRole.DOCENTE_AUXILIAR);
+  const [rol, setRol] = useState<UserRole>(UserRole.DOCENTE);
   const [carreraId, setCarreraId] = useState(carreras[0]?.id ?? '');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);

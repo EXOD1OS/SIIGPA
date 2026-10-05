@@ -3,6 +3,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 export type PlanifTab = 'PAAC' | 'PAAD' | 'PEDAGOGICO' | 'DISCIPLINAR' | 'GENERAL';
 
 interface PlanifState {
+  selectedCycle: number;
   selectedCarreraId: string | null;
   activePlanifId: string | null;
   currentDocumentType: PlanifTab;
@@ -10,6 +11,7 @@ interface PlanifState {
 }
 
 const initialState: PlanifState = {
+  selectedCycle: new Date().getFullYear(),
   selectedCarreraId: null,
   activePlanifId: null,
   currentDocumentType: 'PAAC',
@@ -20,6 +22,9 @@ export const planificationSlice = createSlice({
   name: 'planification',
   initialState,
   reducers: {
+    setSelectedCycle: (state, action: PayloadAction<number>) => {
+      state.selectedCycle = action.payload;
+    },
     setSelectedCarreraId: (state, action: PayloadAction<string | null>) => {
       state.selectedCarreraId = action.payload;
     },

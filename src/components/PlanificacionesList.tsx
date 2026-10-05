@@ -35,7 +35,9 @@ export function PlanificacionesList({ planificaciones, rol }: { planificaciones:
   const [carrera, setCarrera] = useState(TODOS);
   const [estado, setEstado] = useState(TODOS);
 
-  const ciclos = Array.from(new Set(planificaciones.map((p) => p.cicloLectivo))).sort((a, b) => b - a);
+  const ciclos = Array.from(new Set([new Date().getFullYear(), ...planificaciones.map((p) => p.cicloLectivo)])).sort(
+    (a, b) => b - a
+  );
   const sedes = Array.from(new Set(planificaciones.map((p) => p.asignatura.planEstudio.carrera.sede.nombre))).sort();
   const carreras = useMemo(
     () =>
