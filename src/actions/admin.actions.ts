@@ -6,6 +6,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { defaultPaad } from '@/lib/defaults';
+import { generarPlanificacionesDelCiclo } from '@/lib/generar-planificaciones';
 import { UserRole } from '@prisma/client';
 
 const CATEGORIAS_DOCENTES = ['TITULAR', 'ASOCIADO', 'ADJUNTO', 'JTP', 'AYUDANTE'];
@@ -117,6 +118,15 @@ export async function crearUsuario(input: {
   return usuario;
 }
 
+export async function generarPlanificaciones(cicloLectivo: number) {
+  await requireAdmin();
+  const resultado = await generarPlanificacionesDelCiclo(prisma, cicloLectivo);
+  revalidatePath('/admin');
+  revalidatePath('/planificaciones');
+  revalidatePath('/dashboard');
+  return resultado;
+}
+
 // ============================================================================
 // Equipo de Cátedra (roster independiente de la Planificacion)
 // ============================================================================
@@ -165,17 +175,27 @@ export async function desvincularIntegrante(asignacionId: string) {
 
 export async function designarResponsable(asignaturaId: string, cicloLectivo: number, asignacionId: string) {
   await requireAdmin();
-
-  await prisma.$transaction([
-    prisma.asignacionCatedra.updateMany({
-      where: { asignaturaId, cicloLectivo },
-      data: { esResponsable: false },
-    }),
-    prisma.asignacionCatedra.update({
-      where: { id: asignacionId },
-      data: { esResponsable: true },
-    }),
-  ]);
+  await prisma.$transaction(async (tx) => {
+    const integrante = await tx.asignacionCatedra.findUnique({ where: { id: asignacionId } });
+    if (!integrante || integrante.asignaturaId !== asignaturaId || integrante.cicloLectivo !== cicloLectivo) {
+      throw new Error('El docente no pertenece al equipo de esa materia y ciclo.');
+    }
+    const planificacion = await tx.planificacion.findUnique({
+      where: { asignaturaId_cicloLectivo: { asignaturaId, cicloLectivo } },
+    });
+    if (planificacion && !['BORRADOR', 'OBSERVADO'].includes(planificacion.estado)) {
+      throw new Error('No se puede cambiar el responsable de una planificación que ya está en revisión o aprobada.');
+    }
+    await tx.asignacionCatedra.updateMany({ where: { asignaturaId, cicloLectivo }, data: { esResponsable: false } });
+    await tx.asignacionCatedra.update({ where: { id: asignacionId }, data: { esResponsable: true } });
+    if (planificacion) {
+      await tx.planificacion.update({
+        where: { id: planificacion.id },
+        data: { docenteResponsableId: integrante.docenteId },
+      });
+    }
+  });
 
   revalidatePath('/admin');
+  revalidatePath('/planificaciones');
 }

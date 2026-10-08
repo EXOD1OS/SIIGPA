@@ -34,8 +34,10 @@ async function requirePlanificacionVisible(planificacionId: string, session: Awa
   return planif;
 }
 
-function requireEstadoEditable(estado: string) {
-  if (!['BORRADOR', 'OBSERVADO'].includes(estado)) throw new Error('No editable en el estado actual.');
+function requireEstadoEditable(estado: string, tienePendientes = false) {
+  if (!['BORRADOR', 'OBSERVADO'].includes(estado) && !(tienePendientes && permiteObservaciones(estado))) {
+    throw new Error('No editable en el estado actual.');
+  }
 }
 
 function requireSinObservacionesPendientes(planif: { observaciones: readonly { resuelto: boolean }[] }, mensaje: string) {
@@ -48,11 +50,12 @@ export async function actualizarPaac(planifId: string, datosPaac: PaacData) {
 
   const puedeEditar = planif.docenteResponsableId === session.user.id || session.user.rol === UserRole.ADMINISTRADOR;
   if (!puedeEditar) throw new Error('No autorizado.');
-  requireEstadoEditable(planif.estado);
+  const tienePendientes = tieneObservacionesPendientes(planif.observaciones);
+  requireEstadoEditable(planif.estado, tienePendientes);
 
   const updated = await prisma.planificacion.update({
     where: { id: planifId },
-    data: { datosPaac: datosPaac as any },
+    data: { datosPaac: datosPaac as any, ...(tienePendientes ? { estado: 'OBSERVADO' } : {}) },
   });
 
   revalidatePlanif(planifId);
@@ -71,7 +74,8 @@ export async function guardarPaad(input: {
   if (!esPropio && !esAdmin) throw new Error('No autorizado.');
 
   const planif = await requirePlanificacionVisible(input.planificacionId, session);
-  requireEstadoEditable(planif.estado);
+  const tienePendientes = tieneObservacionesPendientes(planif.observaciones);
+  requireEstadoEditable(planif.estado, tienePendientes);
 
   const paadExistente = await prisma.paadDocente.findUnique({
     where: { planificacionId_docenteId: { planificacionId: input.planificacionId, docenteId: input.docenteId } },
@@ -80,7 +84,12 @@ export async function guardarPaad(input: {
 
   const paad = await prisma.paadDocente.upsert({
     where: { planificacionId_docenteId: { planificacionId: input.planificacionId, docenteId: input.docenteId } },
-    update: { cargoEnCatedra: input.cargoEnCatedra, datosPaad: input.datosPaad as any, estadoPresento: 'PRESENTO' },
+    update: {
+      cargoEnCatedra: input.cargoEnCatedra,
+      datosPaad: input.datosPaad as any,
+      estadoPresento: 'PRESENTO',
+      ...(tienePendientes ? { planificacion: { update: { estado: 'OBSERVADO' } } } : {}),
+    },
     create: {
       planificacionId: input.planificacionId,
       docenteId: input.docenteId,
@@ -207,16 +216,28 @@ export async function agregarObservacion(input: {
     throw new Error('El docente no pertenece al equipo de esta planificación.');
   }
 
-  const observacion = await prisma.itemObservacion.create({
-    data: {
-      planificacionId: input.planificacionId,
-      documentoTipo: input.documentoTipo,
-      campoPath: input.campoPath,
-      docentePaadId: input.docentePaadId,
-      mensaje: input.mensaje,
-      autorId: session.user.id,
-      rolAutor: session.user.rol,
-    },
+  const observacion = await prisma.$transaction(async (tx) => {
+    const creada = await tx.itemObservacion.create({
+      data: {
+        planificacionId: input.planificacionId,
+        documentoTipo: input.documentoTipo,
+        campoPath: input.campoPath,
+        docentePaadId: input.docentePaadId,
+        mensaje: input.mensaje,
+        autorId: session.user.id,
+        rolAutor: session.user.rol,
+      },
+    });
+
+    // Una observación abre formalmente el ciclo de corrección. Sin esta
+    // transición el docente podía leer el comentario, pero los formularios
+    // seguían bloqueados por conservar el estado de revisión anterior.
+    await tx.planificacion.update({
+      where: { id: input.planificacionId },
+      data: { estado: 'OBSERVADO' },
+    });
+
+    return creada;
   });
 
   revalidatePlanif(input.planificacionId);

@@ -32,7 +32,10 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
 
   const rol = session.user.rol;
   const esResponsable = planif.docenteResponsableId === session.user.id;
-  const editablePaac = ['BORRADOR', 'OBSERVADO'].includes(planif.estado) && (esResponsable || rol === UserRole.ADMINISTRADOR);
+  const tieneObservacionesPendientes = planif.observaciones.some((observacion) => !observacion.resuelto);
+  const estadoPermiteCorreccion =
+    ['BORRADOR', 'OBSERVADO'].includes(planif.estado) || (tieneObservacionesPendientes && permiteObservaciones(planif.estado));
+  const editablePaac = estadoPermiteCorreccion && (esResponsable || rol === UserRole.ADMINISTRADOR);
   const canObserve = hasRole(rol, [UserRole.UAP, UserRole.DIRECCION_CARRERA]) && permiteObservaciones(planif.estado);
   const canResolveObs = (esResponsable || rol === UserRole.ADMINISTRADOR) && planif.estado === 'OBSERVADO';
 
@@ -116,7 +119,7 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
               <div className="space-y-4">
                 {planif.paads.map((paad) => {
                   const puedeEditarEstePaad =
-                    ['BORRADOR', 'OBSERVADO'].includes(planif.estado) &&
+                    estadoPermiteCorreccion &&
                     (session.user.id === paad.docenteId || rol === UserRole.ADMINISTRADOR);
                   return (
                     <PaadForm

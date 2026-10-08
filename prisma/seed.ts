@@ -7,6 +7,8 @@ import type {
   DisciplinaryReportData,
 } from '../src/types/planificacion';
 import { ISI_CATEDRAS } from './isi-catedras';
+import { generarPlanificacionesDelCiclo } from '../src/lib/generar-planificaciones';
+import { defaultPaad } from '../src/lib/defaults';
 
 const prisma = new PrismaClient();
 
@@ -660,25 +662,10 @@ async function main() {
     }
   }
 
-  // Crear una planificación borrador por cada materia ISI importada. La
-  // planificación existente de Programación I conserva su PAAC de ejemplo y
-  // recibe los nuevos integrantes del equipo de cátedra.
-  const paadImportado = (): PaadData => ({
-    actividadEnsenanza: { cursosAtendidos: [], capacitaciones: [], materialElaborado: [], otrosTrabajosDocentes: [] },
-    investigacion: [],
-    formacionRecursosHumanos: { detalle: '' },
-    formacionAcademica: { detalle: '' },
-    extension: [],
-    gestion: { detalle: '' },
-    otrasActividades: [],
-    distribucionHoraria: [
-      { actividad: 'ENSENANZA' },
-      { actividad: 'INVESTIGACION' },
-      { actividad: 'EXTENSION' },
-      { actividad: 'FORMACION' },
-      { actividad: 'GESTION' },
-    ],
-  });
+  // Crear borradores vacíos para las materias con equipo 2026. El PAAC de
+  // ejemplo de Programación I se conserva sin cambios.
+  const generacion = await generarPlanificacionesDelCiclo(prisma, 2026);
+  planificacionesIsiImportadas = generacion.creadas;
   const asignaturasIsi = await prisma.asignatura.findMany({
     where: { planEstudioId: planIsiNuevo.id },
     include: { asignacionesCatedra: { where: { cicloLectivo: 2026 }, orderBy: { createdAt: 'asc' } } },
@@ -689,37 +676,7 @@ async function main() {
     const existente = await prisma.planificacion.findUnique({
       where: { asignaturaId_cicloLectivo: { asignaturaId: asignatura.id, cicloLectivo: 2026 } },
     });
-    let planificacionId = existente?.id;
-    if (!existente) {
-      const responsableId = equipo[0].docenteId;
-      const datosPaacImportado = {
-        ...datosPaacProg,
-        encabezado: {
-          ...datosPaacProg.encabezado,
-          asignatura: asignatura.nombre,
-          curso: 'A DEFINIR',
-          regimen: asignatura.regimen,
-          creditoHorario: asignatura.creditoHorario,
-          equipoCatedra: equipo.map((integrante) => ({ cargo: integrante.categoria, nombre: 'Docente ISI' })),
-          contenidosMinimos: asignatura.contenidosMinimosOficiales,
-        },
-        fundamentacion: {
-          ...datosPaacProg.fundamentacion,
-          importanciaAsignatura: 'Pendiente de completar según el plan de estudios ISI.',
-        },
-      } as any;
-      const creado = await prisma.planificacion.create({
-        data: {
-          asignaturaId: asignatura.id,
-          cicloLectivo: 2026,
-          docenteResponsableId: responsableId,
-          estado: 'BORRADOR',
-          datosPaac: datosPaacImportado,
-        },
-      });
-      planificacionId = creado.id;
-      planificacionesIsiImportadas += 1;
-    }
+    const planificacionId = existente?.id;
     if (!planificacionId) throw new Error(`No se pudo determinar la planificación de ${asignatura.nombre}.`);
     for (const integrante of equipo) {
       await prisma.paadDocente.upsert({
@@ -730,7 +687,7 @@ async function main() {
           docenteId: integrante.docenteId,
           cargoEnCatedra: integrante.categoria,
           estadoPresento: 'NO_PRESENTO',
-          datosPaad: paadImportado() as any,
+          datosPaad: defaultPaad() as any,
         },
       });
     }

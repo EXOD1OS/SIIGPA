@@ -55,7 +55,14 @@ Ord. HCS 448/2011.
    planificaciones en borrador para el ciclo 2026. Las cuentas importadas usan el formato
    `nombre.apellido@unlar.edu.ar`, la contraseña
    inicial `unlar2026` y deben cambiarla al ingresar. El relevamiento no informa año, régimen, carga horaria
-   ni responsable, por lo que esos campos quedan como `A DEFINIR` y no se generan PAAC incompletos.
+   ni responsable, por lo que esos campos quedan como `A DEFINIR` y los PAAC se crean como borradores
+   vacíos. El primer integrante queda como responsable provisional hasta que Administración lo confirme.
+
+   Para otros ciclos, Administración puede iniciar el ciclo desde Gestión Académica. La acción copia
+   automáticamente los equipos del ciclo anterior y crea los borradores faltantes; no modifica el historial
+   ni las planificaciones existentes.
+   También puede ejecutarse con `npm run prisma:planificaciones -- 2027` usando la base configurada
+   en `DATABASE_URL`, sin reiniciar ni sembrar de nuevo la base.
 
 ## Circuito de estados
 

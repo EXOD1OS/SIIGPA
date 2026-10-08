@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { UserRole } from '@prisma/client';
 import { EstructuraExplorer } from '@/components/admin/EstructuraExplorer';
 import { AdminTabs } from '@/components/admin/AdminTabs';
+import { GenerarPlanificacionesPanel } from '@/components/admin/GenerarPlanificacionesPanel';
 
 export default async function AdminHubPage() {
   const session = await getServerSession(authOptions);
@@ -46,6 +47,8 @@ export default async function AdminHubPage() {
           desplegá hasta llegar a una asignatura para gestionar su equipo de cátedra.
         </p>
       </div>
+
+      <GenerarPlanificacionesPanel />
 
       <div>
         <EstructuraExplorer
