@@ -51,8 +51,9 @@ Ord. HCS 448/2011.
    | titular.prog@unlar.edu.ar      | Docente Responsable         |
    | auxiliar.prog@unlar.edu.ar     | Docente Auxiliar            |
 
-   El seed también carga el relevamiento de cátedras de ISI: 59 materias, docentes y sus asignaciones
-   para el ciclo 2026. Las cuentas importadas usan el formato `nombre.apellido@unlar.edu.ar`, la contraseña
+   El seed también carga el relevamiento de cátedras de ISI: 59 materias, docentes, asignaciones y
+   planificaciones en borrador para el ciclo 2026. Las cuentas importadas usan el formato
+   `nombre.apellido@unlar.edu.ar`, la contraseña
    inicial `unlar2026` y deben cambiarla al ingresar. El relevamiento no informa año, régimen, carga horaria
    ni responsable, por lo que esos campos quedan como `A DEFINIR` y no se generan PAAC incompletos.
 

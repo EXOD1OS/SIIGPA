@@ -598,6 +598,7 @@ async function main() {
   let materiasIsiImportadas = 0;
   let docentesIsiImportados = 0;
   let asignacionesIsiImportadas = 0;
+  let planificacionesIsiImportadas = 0;
 
   for (let i = 0; i < ISI_CATEDRAS.length; i += 1) {
     const registro = ISI_CATEDRAS[i];
@@ -647,8 +648,84 @@ async function main() {
     }
   }
 
+  // Crear una planificación borrador por cada materia ISI importada. La
+  // planificación existente de Programación I conserva su PAAC de ejemplo y
+  // recibe los nuevos integrantes del equipo de cátedra.
+  const paadImportado = (): PaadData => ({
+    actividadEnsenanza: { cursosAtendidos: [], capacitaciones: [], materialElaborado: [], otrosTrabajosDocentes: [] },
+    investigacion: [],
+    formacionRecursosHumanos: { detalle: '' },
+    formacionAcademica: { detalle: '' },
+    extension: [],
+    gestion: { detalle: '' },
+    otrasActividades: [],
+    distribucionHoraria: [
+      { actividad: 'ENSENANZA' },
+      { actividad: 'INVESTIGACION' },
+      { actividad: 'EXTENSION' },
+      { actividad: 'FORMACION' },
+      { actividad: 'GESTION' },
+    ],
+  });
+  const asignaturasIsi = await prisma.asignatura.findMany({
+    where: { planEstudioId: planIsiNuevo.id },
+    include: { asignacionesCatedra: { where: { cicloLectivo: 2026 }, orderBy: { createdAt: 'asc' } } },
+  });
+  for (const asignatura of asignaturasIsi) {
+    const equipo = asignatura.asignacionesCatedra;
+    if (!equipo.length) continue;
+    const existente = await prisma.planificacion.findUnique({
+      where: { asignaturaId_cicloLectivo: { asignaturaId: asignatura.id, cicloLectivo: 2026 } },
+    });
+    let planificacionId = existente?.id;
+    if (!existente) {
+      const responsableId = equipo[0].docenteId;
+      const datosPaacImportado = {
+        ...datosPaacProg,
+        encabezado: {
+          ...datosPaacProg.encabezado,
+          asignatura: asignatura.nombre,
+          curso: 'A DEFINIR',
+          regimen: asignatura.regimen,
+          creditoHorario: asignatura.creditoHorario,
+          equipoCatedra: equipo.map((integrante) => ({ cargo: integrante.categoria, nombre: 'Docente ISI' })),
+          contenidosMinimos: asignatura.contenidosMinimosOficiales,
+        },
+        fundamentacion: {
+          ...datosPaacProg.fundamentacion,
+          importanciaAsignatura: 'Pendiente de completar según el plan de estudios ISI.',
+        },
+      } as any;
+      const creado = await prisma.planificacion.create({
+        data: {
+          asignaturaId: asignatura.id,
+          cicloLectivo: 2026,
+          docenteResponsableId: responsableId,
+          estado: 'BORRADOR',
+          datosPaac: datosPaacImportado,
+        },
+      });
+      planificacionId = creado.id;
+      planificacionesIsiImportadas += 1;
+    }
+    if (!planificacionId) throw new Error(`No se pudo determinar la planificación de ${asignatura.nombre}.`);
+    for (const integrante of equipo) {
+      await prisma.paadDocente.upsert({
+        where: { planificacionId_docenteId: { planificacionId, docenteId: integrante.docenteId } },
+        update: { cargoEnCatedra: integrante.categoria },
+        create: {
+          planificacionId,
+          docenteId: integrante.docenteId,
+          cargoEnCatedra: integrante.categoria,
+          estadoPresento: 'NO_PRESENTO',
+          datosPaad: paadImportado() as any,
+        },
+      });
+    }
+  }
+
   console.log('Seed ejecutado con éxito.');
-  console.log(`Carga ISI: ${materiasIsiImportadas} materias nuevas, ${docentesIsiImportados} docentes nuevos y ${asignacionesIsiImportadas} asignaciones 2026.`);
+  console.log(`Carga ISI: ${materiasIsiImportadas} materias nuevas, ${docentesIsiImportados} docentes nuevos, ${asignacionesIsiImportadas} asignaciones 2026 y ${planificacionesIsiImportadas} planificaciones borrador.`);
   console.log('Usuarios de prueba (password: unlar2026):');
   console.log('  admin@unlar.edu.ar (ADMINISTRADOR)');
   console.log('  direccion.isi@unlar.edu.ar / direccion.lsi@unlar.edu.ar / direccion.educacion@unlar.edu.ar (DIRECCION_CARRERA)');
