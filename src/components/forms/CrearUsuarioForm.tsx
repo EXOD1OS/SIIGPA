@@ -5,11 +5,18 @@ import { useRouter } from 'next/navigation';
 import { UserRole } from '@prisma/client';
 import { crearUsuario } from '@/actions/admin.actions';
 import { ROL_LABELS } from '@/types/planificacion';
-import { TextField, SelectField, SectionCard } from './fields';
+import { TextField, SelectField, NumberField, SectionCard } from './fields';
 
 const ROLES = Object.values(UserRole);
+const CATEGORIAS_DOCENTES = ['TITULAR', 'ASOCIADO', 'ADJUNTO', 'JTP', 'AYUDANTE'];
 
-export function CrearUsuarioForm({ carreras }: { carreras: { id: string; nombre: string; codigo: string }[] }) {
+export function CrearUsuarioForm({
+  carreras,
+  asignaturas,
+}: {
+  carreras: { id: string; nombre: string; codigo: string }[];
+  asignaturas: { id: string; nombre: string; carrera: string; planEstudio: string }[];
+}) {
   const router = useRouter();
   const [nombre, setNombre] = useState('');
   const [apellido, setApellido] = useState('');
@@ -17,6 +24,9 @@ export function CrearUsuarioForm({ carreras }: { carreras: { id: string; nombre:
   const [dni, setDni] = useState('');
   const [rol, setRol] = useState<UserRole>(UserRole.DOCENTE);
   const [carreraId, setCarreraId] = useState(carreras[0]?.id ?? '');
+  const [asignaturaId, setAsignaturaId] = useState('');
+  const [cicloLectivo, setCicloLectivo] = useState(new Date().getFullYear());
+  const [categoria, setCategoria] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -25,6 +35,10 @@ export function CrearUsuarioForm({ carreras }: { carreras: { id: string; nombre:
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    if (rol === UserRole.DOCENTE && asignaturaId && !categoria) {
+      setError('Seleccioná la categoría docente para la materia.');
+      return;
+    }
     setLoading(true);
     try {
       await crearUsuario({
@@ -34,12 +48,18 @@ export function CrearUsuarioForm({ carreras }: { carreras: { id: string; nombre:
         dni,
         rol,
         carreraId: rol === UserRole.DIRECCION_CARRERA ? carreraId : null,
+        asignacionInicial:
+          rol === UserRole.DOCENTE && asignaturaId
+            ? { asignaturaId, cicloLectivo, categoria }
+            : undefined,
       });
-      setSuccess(`Usuario creado. Contraseña temporal: el DNI (${dni}).`);
+      setSuccess(`Usuario creado${rol === UserRole.DOCENTE && asignaturaId ? ' y asignado a la materia' : ''}. Contraseña temporal: el DNI (${dni}).`);
       setNombre('');
       setApellido('');
       setEmail('');
       setDni('');
+      setAsignaturaId('');
+      setCategoria('');
       router.refresh();
     } catch (err: any) {
       setError(err.message ?? 'No se pudo crear el usuario.');
@@ -71,6 +91,38 @@ export function CrearUsuarioForm({ carreras }: { carreras: { id: string; nombre:
             />
           )}
         </div>
+
+        {rol === UserRole.DOCENTE && (
+          <div className="space-y-3 border border-border rounded-lg p-3">
+            <SelectField
+              label="Materia inicial (opcional)"
+              value={asignaturaId}
+              options={[
+                { value: '', label: 'Sin materia por ahora' },
+                ...asignaturas.map((a) => ({
+                  value: a.id,
+                  label: `${a.nombre} — ${a.carrera} · ${a.planEstudio}`,
+                })),
+              ]}
+              onChange={setAsignaturaId}
+            />
+            {asignaturaId && (
+              <div className="grid grid-cols-2 gap-4">
+                <NumberField label="Ciclo lectivo" value={cicloLectivo} onChange={setCicloLectivo} />
+                <SelectField
+                  label="Categoría docente"
+                  value={categoria}
+                  options={[
+                    { value: '', label: 'Seleccionar categoría' },
+                    ...CATEGORIAS_DOCENTES.map((c) => ({ value: c, label: c })),
+                  ]}
+                  onChange={setCategoria}
+                />
+              </div>
+            )}
+            <p className="text-xs text-gray-500">Podés asignar más materias y designar al responsable desde Gestión Académica.</p>
+          </div>
+        )}
 
         {error && <p className="text-sm text-danger">{error}</p>}
         {success && <p className="text-sm text-success">{success}</p>}

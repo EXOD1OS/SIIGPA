@@ -11,7 +11,7 @@ export default async function UsuariosPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user || session.user.rol !== UserRole.ADMINISTRADOR) redirect('/dashboard');
 
-  const [usuarios, carreras] = await Promise.all([
+  const [usuarios, carreras, asignaturas] = await Promise.all([
     prisma.usuario.findMany({
       include: {
         carrera: true,
@@ -20,6 +20,10 @@ export default async function UsuariosPage() {
       orderBy: [{ rol: 'asc' }, { apellido: 'asc' }],
     }),
     prisma.carrera.findMany({ orderBy: { nombre: 'asc' } }),
+    prisma.asignatura.findMany({
+      include: { planEstudio: { include: { carrera: true } } },
+      orderBy: { nombre: 'asc' },
+    }),
   ]);
 
   const filas: UsuarioRow[] = usuarios.map((u) => ({
@@ -54,7 +58,15 @@ export default async function UsuariosPage() {
         </p>
       </div>
 
-      <CrearUsuarioForm carreras={carreras} />
+      <CrearUsuarioForm
+        carreras={carreras}
+        asignaturas={asignaturas.map((a) => ({
+          id: a.id,
+          nombre: a.nombre,
+          carrera: a.planEstudio.carrera.codigo,
+          planEstudio: a.planEstudio.ordenanza,
+        }))}
+      />
 
       <UsuariosPanel usuarios={filas} />
     </div>
