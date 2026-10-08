@@ -8,6 +8,7 @@ import { PlanifStatus, UserRole } from '@prisma/client';
 import { hasRole } from '@/lib/roles';
 import { defaultPaad } from '@/lib/defaults';
 import { planificacionVisiblePara } from '@/lib/visibilidad';
+import { permiteObservaciones, tieneObservacionesPendientes } from '@/lib/observaciones';
 import type {
   PaacData,
   PaadData,
@@ -35,6 +36,10 @@ async function requirePlanificacionVisible(planificacionId: string, session: Awa
 
 function requireEstadoEditable(estado: string) {
   if (!['BORRADOR', 'OBSERVADO'].includes(estado)) throw new Error('No editable en el estado actual.');
+}
+
+function requireSinObservacionesPendientes(planif: { observaciones: readonly { resuelto: boolean }[] }, mensaje: string) {
+  if (tieneObservacionesPendientes(planif.observaciones)) throw new Error(mensaje);
 }
 
 export async function actualizarPaac(planifId: string, datosPaac: PaacData) {
@@ -168,6 +173,10 @@ export async function enviarARevision(planifId: string) {
 
   const equipoCompleto = planif.paads.length > 0 && planif.paads.every((p) => p.estadoPresento === 'PRESENTO');
   if (!equipoCompleto) throw new Error('El equipo docente no completó todos los PAAD.');
+  requireSinObservacionesPendientes(
+    planif,
+    'No se puede enviar a revisión: primero deben resolverse todas las observaciones pendientes.',
+  );
 
   const updated = await prisma.planificacion.update({
     where: { id: planifId },
@@ -191,7 +200,9 @@ export async function agregarObservacion(input: {
   }
 
   const planif = await requirePlanificacionVisible(input.planificacionId, session);
-  if (planif.estado === 'BORRADOR') throw new Error('No se pueden observar planificaciones en borrador.');
+  if (!permiteObservaciones(planif.estado)) {
+    throw new Error('Solo se pueden observar planificaciones enviadas a revisión o en evaluación.');
+  }
   if (input.documentoTipo === 'PAAD' && input.docentePaadId && !planif.paads.some((p) => p.id === input.docentePaadId)) {
     throw new Error('El docente no pertenece al equipo de esta planificación.');
   }
@@ -267,6 +278,11 @@ export async function registrarAprobacionPedagogica(planifId: string, dictamen: 
     return updated;
   }
 
+  requireSinObservacionesPendientes(
+    planif,
+    'No se puede registrar un dictamen favorable mientras existan observaciones pendientes.',
+  );
+
   const nuevoEstado: PlanifStatus = planif.estado === 'APROBADO_DISCIPLINAR' ? 'APROBADO_PLENO' : 'APROBADO_PEDAGOGICO';
   const updated = await prisma.planificacion.update({
     where: { id: planifId },
@@ -294,6 +310,11 @@ export async function registrarAprobacionDisciplinar(planifId: string, dictamen:
     revalidatePlanif(planifId);
     return updated;
   }
+
+  requireSinObservacionesPendientes(
+    planif,
+    'No se puede registrar un dictamen favorable mientras existan observaciones pendientes.',
+  );
 
   const nuevoEstado: PlanifStatus = planif.estado === 'APROBADO_PEDAGOGICO' ? 'APROBADO_PLENO' : 'APROBADO_DISCIPLINAR';
   const updated = await prisma.planificacion.update({
@@ -335,6 +356,7 @@ export async function elevarAlConsejo(planifId: string) {
 
   const planif = await requirePlanificacionVisible(planifId, session);
   if (planif.estado !== 'APROBADO_PLENO') throw new Error('La planificación debe estar Aprobada Plena para elevarla.');
+  requireSinObservacionesPendientes(planif, 'No se puede elevar una planificación con observaciones pendientes.');
   if (!planif.informeGeneral) throw new Error('Falta elaborar el Informe General de PAAC junto a la UAP.');
   const informeGeneral = planif.informeGeneral as unknown as GeneralReportData;
   if (!informeGeneral.elaboradoPorUap || !informeGeneral.elaboradoPorDireccion) {

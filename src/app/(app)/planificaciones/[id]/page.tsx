@@ -20,6 +20,7 @@ import { InformeDisciplinarPanel } from '@/components/forms/InformeDisciplinarPa
 import { InformeGeneralPanel } from '@/components/forms/InformeGeneralPanel';
 import { PlanificacionTabs, type TabDef } from '@/components/PlanificacionTabs';
 import { SectionCard } from '@/components/forms/fields';
+import { permiteObservaciones } from '@/lib/observaciones';
 import type { PaadData, GeneralReportData, PedagogicalReportData, DisciplinaryReportData } from '@/types/planificacion';
 
 export default async function PlanificacionDetailPage({ params }: { params: { id: string } }) {
@@ -32,7 +33,7 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
   const rol = session.user.rol;
   const esResponsable = planif.docenteResponsableId === session.user.id;
   const editablePaac = ['BORRADOR', 'OBSERVADO'].includes(planif.estado) && (esResponsable || rol === UserRole.ADMINISTRADOR);
-  const canObserve = hasRole(rol, [UserRole.UAP, UserRole.DIRECCION_CARRERA]) && planif.estado !== 'BORRADOR';
+  const canObserve = hasRole(rol, [UserRole.UAP, UserRole.DIRECCION_CARRERA]) && permiteObservaciones(planif.estado);
   const canResolveObs = (esResponsable || rol === UserRole.ADMINISTRADOR) && planif.estado === 'OBSERVADO';
 
   const docentesDisponibles =
