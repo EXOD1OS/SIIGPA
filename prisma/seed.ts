@@ -6,6 +6,7 @@ import type {
   PedagogicalReportData,
   DisciplinaryReportData,
 } from '../src/types/planificacion';
+import { ISI_CATEDRAS } from './isi-catedras';
 
 const prisma = new PrismaClient();
 
@@ -584,7 +585,70 @@ async function main() {
     ],
   });
 
+  // Carga de referencia ISI a partir del relevamiento de profesores y cátedras.
+  // El archivo fuente no informa año, régimen, carga horaria ni responsable, por
+  // eso esos datos quedan explícitamente pendientes y no se generan PAAC.
+  const normalizar = (texto: string) =>
+    texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const slugDocente = (texto: string) => normalizar(texto).replace(/\s+/g, '.');
+  const docentesExistentes = new Map([
+    ['lastra mariana', profLastra],
+    ['nieto alejandro', profNieto],
+  ]);
+  let materiasIsiImportadas = 0;
+  let docentesIsiImportados = 0;
+  let asignacionesIsiImportadas = 0;
+
+  for (let i = 0; i < ISI_CATEDRAS.length; i += 1) {
+    const registro = ISI_CATEDRAS[i];
+    const claveDocente = normalizar(registro.docente);
+    let docente = docentesExistentes.get(claveDocente);
+    if (!docente) {
+      docente = await prisma.usuario.create({
+        data: {
+          nombre: 'Docente importado',
+          apellido: registro.docente,
+          email: `${slugDocente(registro.docente)}@unlar.edu.ar`,
+          dni: `ISI-IMPORT-${String(i + 1).padStart(3, '0')}`,
+          rol: UserRole.DOCENTE,
+          passwordHash,
+          mustChangePassword: true,
+        },
+      });
+      docentesIsiImportados += 1;
+    }
+
+    for (const nombreMateria of registro.materias) {
+      let asignatura = await prisma.asignatura.findFirst({ where: { planEstudioId: planIsiNuevo.id, nombre: nombreMateria } });
+      if (!asignatura) {
+        asignatura = await prisma.asignatura.create({
+          data: {
+            planEstudioId: planIsiNuevo.id,
+            departamentoRadicacionId: deptoExactas.id,
+            nombre: nombreMateria,
+            anoCursada: 0,
+            regimen: 'A DEFINIR',
+            creditoHorario: 0,
+            contenidosMinimosOficiales: 'Pendiente de completar según el plan de estudios ISI.',
+          },
+        });
+        materiasIsiImportadas += 1;
+      }
+      await prisma.asignacionCatedra.create({
+        data: {
+          asignaturaId: asignatura.id,
+          cicloLectivo: 2026,
+          docenteId: docente.id,
+          categoria: 'A DEFINIR',
+          esResponsable: false,
+        },
+      });
+      asignacionesIsiImportadas += 1;
+    }
+  }
+
   console.log('Seed ejecutado con éxito.');
+  console.log(`Carga ISI: ${materiasIsiImportadas} materias nuevas, ${docentesIsiImportados} docentes nuevos y ${asignacionesIsiImportadas} asignaciones 2026.`);
   console.log('Usuarios de prueba (password: unlar2026):');
   console.log('  admin@unlar.edu.ar (ADMINISTRADOR)');
   console.log('  direccion.isi@unlar.edu.ar / direccion.lsi@unlar.edu.ar / direccion.educacion@unlar.edu.ar (DIRECCION_CARRERA)');
