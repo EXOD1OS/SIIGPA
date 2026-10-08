@@ -591,6 +591,17 @@ async function main() {
   const normalizar = (texto: string) =>
     texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
   const slugDocente = (texto: string) => normalizar(texto).replace(/\s+/g, '.');
+  const separarNombre = (texto: string) => {
+    const limpio = texto.replace(/\s+/g, ' ').trim();
+    const separador = limpio.indexOf(',');
+    if (separador > 0) {
+      return {
+        nombre: limpio.slice(separador + 1).trim(),
+        apellido: limpio.slice(0, separador).trim(),
+      };
+    }
+    return { nombre: limpio, apellido: '' };
+  };
   const docentesExistentes = new Map([
     ['lastra mariana', profLastra],
     ['nieto alejandro', profNieto],
@@ -605,10 +616,11 @@ async function main() {
     const claveDocente = normalizar(registro.docente);
     let docente = docentesExistentes.get(claveDocente);
     if (!docente) {
+      const identidad = separarNombre(registro.docente);
       docente = await prisma.usuario.create({
         data: {
-          nombre: 'Docente importado',
-          apellido: registro.docente,
+          nombre: identidad.nombre,
+          apellido: identidad.apellido,
           email: `${slugDocente(registro.docente)}@unlar.edu.ar`,
           dni: `ISI-IMPORT-${String(i + 1).padStart(3, '0')}`,
           rol: UserRole.DOCENTE,
