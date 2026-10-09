@@ -28,7 +28,7 @@ export function GenerarPlanificacionesPanel() {
   return (
     <SectionCard title="Planificaciones del ciclo">
       <p className="text-sm text-gray-400">
-        Inicia un ciclo lectivo. Copia automáticamente los equipos del ciclo anterior y habilita un borrador de PAAC y un PAAD por docente. El historial queda intacto.
+        Inicia un ciclo lectivo. Copia los equipos del ciclo anterior, crea un PAAC por materia y un PAAD personal por docente y año. Ambos se presentan de forma independiente. El historial queda intacto.
       </p>
       <div className="flex items-end gap-3">
         <div className="w-40">

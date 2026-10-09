@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex">
       <Sidebar nombre={session.user.name ?? ''} rol={session.user.rol} />
-      <main className="flex-1 min-h-screen px-8 py-8">{children}</main>
+      <main className="flex-1 min-w-0 min-h-screen px-8 py-8">{children}</main>
     </div>
   );
 }

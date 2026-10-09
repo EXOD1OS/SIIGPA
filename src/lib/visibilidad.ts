@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 const include = {
   asignatura: { include: { planEstudio: { include: { carrera: { include: { sede: true } } } }, carreraEvaluadora: true } },
   docenteResponsable: true,
-  paads: { include: { docente: true } },
+  integrantes: { include: { docente: true } },
 } satisfies Prisma.PlanificacionInclude;
 
 type SessionUser = { id: string; rol: UserRole; carreraId: string | null };
@@ -31,7 +31,7 @@ function planificacionesWherePara(user: SessionUser): Prisma.PlanificacionWhereI
     case UserRole.CONSEJO_DEPARTAMENTAL:
       return { estado: { in: ESTADOS_VISIBLES_AL_CONSEJO } };
     case UserRole.DOCENTE:
-      return { OR: [{ docenteResponsableId: user.id }, { paads: { some: { docenteId: user.id } } }] };
+      return { OR: [{ docenteResponsableId: user.id }, { integrantes: { some: { docenteId: user.id } } }] };
     case UserRole.DIRECCION_CARRERA:
       return user.carreraId ? carreraEvaluadoraWhere(user.carreraId) : { id: '__sin-carrera__' };
     default:
@@ -54,7 +54,7 @@ export async function planificacionVisiblePara(user: SessionUser, id: string) {
     where: { AND: [{ id }, planificacionesWherePara(user)] },
     include: {
       ...include,
-      observaciones: { include: { autor: true }, orderBy: { createdAt: 'desc' } },
+      observaciones: { where: { documentoTipo: 'PAAC' }, include: { autor: true }, orderBy: { createdAt: 'desc' } },
     },
   });
 }

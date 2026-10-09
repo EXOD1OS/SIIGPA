@@ -6,12 +6,11 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { PlanifStatus, UserRole } from '@prisma/client';
 import { hasRole } from '@/lib/roles';
-import { defaultPaad } from '@/lib/defaults';
+import { asegurarPaad } from '@/lib/paad';
 import { planificacionVisiblePara } from '@/lib/visibilidad';
 import { permiteObservaciones, tieneObservacionesPendientes } from '@/lib/observaciones';
 import type {
   PaacData,
-  PaadData,
   PedagogicalReportData,
   DisciplinaryReportData,
   GeneralReportData,
@@ -26,6 +25,9 @@ async function requireSession() {
 function revalidatePlanif(id: string) {
   revalidatePath(`/planificaciones/${id}`);
   revalidatePath('/planificaciones');
+  revalidatePath('/paads', 'layout');
+  revalidatePath('/mi-paad');
+  revalidatePath('/admin');
 }
 
 async function requirePlanificacionVisible(planificacionId: string, session: Awaited<ReturnType<typeof requireSession>>) {
@@ -62,47 +64,6 @@ export async function actualizarPaac(planifId: string, datosPaac: PaacData) {
   return updated;
 }
 
-export async function guardarPaad(input: {
-  planificacionId: string;
-  docenteId: string;
-  cargoEnCatedra: string;
-  datosPaad: PaadData;
-}) {
-  const session = await requireSession();
-  const esPropio = session.user.id === input.docenteId && session.user.rol === UserRole.DOCENTE;
-  const esAdmin = session.user.rol === UserRole.ADMINISTRADOR;
-  if (!esPropio && !esAdmin) throw new Error('No autorizado.');
-
-  const planif = await requirePlanificacionVisible(input.planificacionId, session);
-  const tienePendientes = tieneObservacionesPendientes(planif.observaciones);
-  requireEstadoEditable(planif.estado, tienePendientes);
-
-  const paadExistente = await prisma.paadDocente.findUnique({
-    where: { planificacionId_docenteId: { planificacionId: input.planificacionId, docenteId: input.docenteId } },
-  });
-  if (!paadExistente) throw new Error('El docente no pertenece al equipo de esta planificación.');
-
-  const paad = await prisma.paadDocente.upsert({
-    where: { planificacionId_docenteId: { planificacionId: input.planificacionId, docenteId: input.docenteId } },
-    update: {
-      cargoEnCatedra: input.cargoEnCatedra,
-      datosPaad: input.datosPaad as any,
-      estadoPresento: 'PRESENTO',
-      ...(tienePendientes ? { planificacion: { update: { estado: 'OBSERVADO' } } } : {}),
-    },
-    create: {
-      planificacionId: input.planificacionId,
-      docenteId: input.docenteId,
-      cargoEnCatedra: input.cargoEnCatedra,
-      datosPaad: input.datosPaad as any,
-      estadoPresento: 'PRESENTO',
-    },
-  });
-
-  revalidatePlanif(input.planificacionId);
-  return paad;
-}
-
 export async function invitarDocenteEquipo(planificacionId: string, docenteId: string, cargoEnCatedra: string) {
   const session = await requireSession();
   const planif = await requirePlanificacionVisible(planificacionId, session);
@@ -112,27 +73,30 @@ export async function invitarDocenteEquipo(planificacionId: string, docenteId: s
   const docente = await prisma.usuario.findUnique({ where: { id: docenteId }, select: { rol: true } });
   if (!docente || docente.rol !== UserRole.DOCENTE) throw new Error('El integrante debe tener rol Docente.');
 
-  const paad = await prisma.paadDocente.upsert({
-    where: { planificacionId_docenteId: { planificacionId, docenteId } },
-    update: { cargoEnCatedra },
-    create: {
-      planificacionId,
-      docenteId,
-      cargoEnCatedra,
-      estadoPresento: 'NO_PRESENTO',
-      datosPaad: defaultPaad() as any,
-    },
+  const integrante = await prisma.$transaction(async tx => {
+    const miembro = await tx.integrantePlanificacion.upsert({
+      where: { planificacionId_docenteId: { planificacionId, docenteId } },
+      update: { cargoEnCatedra }, create: { planificacionId, docenteId, cargoEnCatedra },
+    });
+    await tx.asignacionCatedra.upsert({
+      where: { asignaturaId_cicloLectivo_docenteId: { asignaturaId: planif.asignaturaId, cicloLectivo: planif.cicloLectivo, docenteId } },
+      create: { asignaturaId: planif.asignaturaId, cicloLectivo: planif.cicloLectivo, docenteId, categoria: cargoEnCatedra },
+      update: { categoria: cargoEnCatedra },
+    });
+    await asegurarPaad(tx, docenteId, planif.cicloLectivo);
+    return miembro;
   });
-
+  revalidatePath('/paads', 'layout');
+  revalidatePath('/admin');
   revalidatePlanif(planificacionId);
-  return paad;
+  return integrante;
 }
 
 export async function quitarDocenteEquipo(planificacionId: string, paadId: string) {
   const session = await requireSession();
   if (session.user.rol !== UserRole.ADMINISTRADOR) throw new Error('No autorizado.');
 
-  const paad = await prisma.paadDocente.findUnique({ where: { id: paadId } });
+  const paad = await prisma.integrantePlanificacion.findUnique({ where: { id: paadId } });
   if (!paad || paad.planificacionId !== planificacionId) throw new Error('No encontrado.');
 
   const planif = await requirePlanificacionVisible(planificacionId, session);
@@ -141,7 +105,11 @@ export async function quitarDocenteEquipo(planificacionId: string, paadId: strin
     throw new Error('No se puede quitar al Docente Responsable. Cambiá el responsable antes de quitarlo del equipo.');
   }
 
-  await prisma.paadDocente.delete({ where: { id: paadId } });
+  await prisma.$transaction(async tx => {
+    await tx.integrantePlanificacion.delete({ where: { id: paadId } });
+    await tx.asignacionCatedra.deleteMany({ where: { asignaturaId: planif.asignaturaId, cicloLectivo: planif.cicloLectivo, docenteId: paad.docenteId } });
+    await asegurarPaad(tx, paad.docenteId, planif.cicloLectivo);
+  });
   revalidatePlanif(planificacionId);
 }
 
@@ -154,21 +122,24 @@ export async function cambiarResponsablePlanificacion(planificacionId: string, n
   const nuevoResponsable = await prisma.usuario.findUnique({ where: { id: nuevoDocenteId }, select: { rol: true } });
   if (!nuevoResponsable || nuevoResponsable.rol !== UserRole.DOCENTE) throw new Error('El responsable debe tener rol Docente.');
 
-  await prisma.$transaction([
-    prisma.paadDocente.upsert({
+  await prisma.$transaction(async tx => {
+    await tx.integrantePlanificacion.upsert({
       where: { planificacionId_docenteId: { planificacionId, docenteId: nuevoDocenteId } },
-      update: {},
-      create: {
-        planificacionId,
-        docenteId: nuevoDocenteId,
-        cargoEnCatedra,
-        estadoPresento: 'NO_PRESENTO',
-        datosPaad: defaultPaad() as any,
-      },
-    }),
-    prisma.planificacion.update({ where: { id: planificacionId }, data: { docenteResponsableId: nuevoDocenteId } }),
-  ]);
-
+      update: { cargoEnCatedra }, create: { planificacionId, docenteId: nuevoDocenteId, cargoEnCatedra },
+    });
+    await tx.planificacion.update({ where: { id: planificacionId }, data: { docenteResponsableId: nuevoDocenteId } });
+    await tx.asignacionCatedra.updateMany({
+      where: { asignaturaId: planif.asignaturaId, cicloLectivo: planif.cicloLectivo }, data: { esResponsable: false },
+    });
+    await tx.asignacionCatedra.upsert({
+      where: { asignaturaId_cicloLectivo_docenteId: { asignaturaId: planif.asignaturaId, cicloLectivo: planif.cicloLectivo, docenteId: nuevoDocenteId } },
+      create: { asignaturaId: planif.asignaturaId, cicloLectivo: planif.cicloLectivo, docenteId: nuevoDocenteId, categoria: cargoEnCatedra, esResponsable: true },
+      update: { categoria: cargoEnCatedra, esResponsable: true },
+    });
+    await asegurarPaad(tx, nuevoDocenteId, planif.cicloLectivo);
+  });
+  revalidatePath('/paads', 'layout');
+  revalidatePath('/admin');
   revalidatePlanif(planificacionId);
 }
 
@@ -180,8 +151,6 @@ export async function enviarARevision(planifId: string) {
   if (!autorizado) throw new Error('No autorizado.');
   if (!['BORRADOR', 'OBSERVADO'].includes(planif.estado)) throw new Error('El estado actual no permite el envío.');
 
-  const equipoCompleto = planif.paads.length > 0 && planif.paads.every((p) => p.estadoPresento === 'PRESENTO');
-  if (!equipoCompleto) throw new Error('El equipo docente no completó todos los PAAD.');
   requireSinObservacionesPendientes(
     planif,
     'No se puede enviar a revisión: primero deben resolverse todas las observaciones pendientes.',
@@ -212,9 +181,7 @@ export async function agregarObservacion(input: {
   if (!permiteObservaciones(planif.estado)) {
     throw new Error('Solo se pueden observar planificaciones enviadas a revisión o en evaluación.');
   }
-  if (input.documentoTipo === 'PAAD' && input.docentePaadId && !planif.paads.some((p) => p.id === input.docentePaadId)) {
-    throw new Error('El docente no pertenece al equipo de esta planificación.');
-  }
+  if (input.documentoTipo !== 'PAAC') throw new Error('Observá el PAAD desde su documento anual.');
 
   const observacion = await prisma.$transaction(async (tx) => {
     const creada = await tx.itemObservacion.create({
@@ -248,6 +215,7 @@ export async function resolverObservacion(observacionId: string) {
   const session = await requireSession();
   const obs = await prisma.itemObservacion.findUnique({ where: { id: observacionId } });
   if (!obs) throw new Error('No encontrada.');
+  if (obs.documentoTipo !== 'PAAC') throw new Error('El PAAD antiguo es un antecedente de solo lectura.');
   const planif = await requirePlanificacionVisible(obs.planificacionId, session);
   if (planif.estado !== 'OBSERVADO') throw new Error('Solo se pueden resolver observaciones de planificaciones observadas.');
   if (planif.docenteResponsableId !== session.user.id && session.user.rol !== UserRole.ADMINISTRADOR) {

@@ -11,6 +11,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:planificaciones": "tsx prisma/generar-planificaciones.ts",
+    "prisma:paad:migrar": "tsx prisma/migrar-paad.ts",
+    "test:paad": "tsx --test tests/paad.test.ts",
+    "test:paad:integracion": "tsx tests/paad-integracion.ts",
     "db:reset": "prisma migrate reset --force"
   },
   "prisma": {

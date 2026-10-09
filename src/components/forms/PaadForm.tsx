@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { guardarPaad } from '@/actions/planificacion.actions';
+import { guardarBorradorPaad, presentarPaad } from '@/actions/paad.actions';
+import { useRouter } from 'next/navigation';
 import { ObservationFieldWrapper } from '@/components/ObservationFieldWrapper';
 import { TextField, TextAreaField, ListField, RepeatableList, SectionCard } from './fields';
 import type { PaadData } from '@/types/planificacion';
@@ -12,13 +13,12 @@ interface Observacion {
   mensaje: string;
   rolAutor: string;
   resuelto: boolean;
-  docentePaadId: string | null;
 }
 
 interface Props {
-  planificacionId: string;
+  presentacionId?: string;
+  canPresent: boolean;
   paadId: string;
-  docenteId: string;
   docenteNombre: string;
   cargoEnCatedra: string;
   estadoPresento: string;
@@ -30,7 +30,7 @@ interface Props {
 }
 
 function obsFor(observaciones: Observacion[], paadId: string, path: string) {
-  return observaciones.filter((o) => o.docentePaadId === paadId && o.campoPath === path);
+  return observaciones.filter((o) => o.campoPath === path);
 }
 
 const DIAS = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'] as const;
@@ -51,9 +51,9 @@ const ACTIVIDAD_LABELS: Record<string, string> = {
 };
 
 export function PaadForm({
-  planificacionId,
+  presentacionId,
+  canPresent,
   paadId,
-  docenteId,
   docenteNombre,
   cargoEnCatedra,
   estadoPresento,
@@ -63,6 +63,9 @@ export function PaadForm({
   canResolve,
   observaciones,
 }: Props) {
+  const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [dirty, setDirty] = useState(false);
   const [form, setForm] = useState<PaadData>(data);
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -74,20 +77,22 @@ export function PaadForm({
       return draft;
     });
     setSaved(false);
+    setDirty(true);
   }
 
   function handleSave() {
     startTransition(async () => {
-      await guardarPaad({ planificacionId, docenteId, cargoEnCatedra, datosPaad: form });
-      setSaved(true);
+      setError(null);
+      try { await guardarBorradorPaad(paadId, form); setSaved(true); setDirty(false); router.refresh(); }
+      catch (e) { setError(e instanceof Error ? e.message : 'No se pudo guardar.'); }
     });
   }
 
   const wrap = (path: string, node: React.ReactNode) => (
     <ObservationFieldWrapper
-      planificacionId={planificacionId}
+      paadAnualId={paadId}
+      presentacionId={presentacionId}
       documentoTipo="PAAD"
-      docentePaadId={paadId}
       fieldPath={path}
       observaciones={obsFor(observaciones, paadId, path)}
       canObserve={canObserve}
@@ -306,11 +311,18 @@ export function PaadForm({
             onClick={handleSave}
             className="bg-primary hover:bg-primary-hover transition-colors text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50"
           >
-            {pending ? 'Guardando...' : 'Guardar y presentar PAAD'}
+            {pending ? 'Guardando...' : 'Guardar borrador PAAD'}
           </button>
+          {canPresent && <button type="button" disabled={pending || dirty} className="bg-success/80 text-white px-4 py-2 rounded-lg disabled:opacity-50"
+            onClick={() => startTransition(async () => {
+              setError(null);
+              try { await presentarPaad(paadId); router.refresh(); } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo presentar.'); }
+            })}>Presentar PAAD</button>}
+          {dirty && <span className="text-xs text-gray-400">Guardá los cambios antes de presentar.</span>}
           {saved && !pending && <span className="text-xs text-success">Guardado.</span>}
         </div>
       )}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </SectionCard>
   );
 }

@@ -39,6 +39,8 @@ export function Sidebar({ nombre, rol }: { nombre: string; rol: string }) {
 
       <nav className="flex-1 px-3 py-4 space-y-1">
         {NAV.map(renderLink)}
+        {rol === 'DOCENTE' && renderLink({ href: '/mi-paad', label: 'Mi PAAD' })}
+        {['UAP', 'DIRECCION_CARRERA', 'ADMINISTRADOR'].includes(rol) && renderLink({ href: '/paads', label: 'PAAD' })}
         {rol === 'ADMINISTRADOR' && NAV_ADMIN.map(renderLink)}
       </nav>
 

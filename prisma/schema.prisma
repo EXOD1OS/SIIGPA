@@ -26,6 +26,15 @@ enum PlanifStatus {
   FINALIZADO
 }
 
+enum PaadStatus {
+  BORRADOR
+  ENVIADO_A_REVISION
+  OBSERVADO
+  APROBADO_UAP
+  APROBADO_DIRECCION
+  APROBADO
+}
+
 model Sede {
   id        String    @id @default(uuid())
   nombre    String
@@ -51,6 +60,7 @@ model Carrera {
   planes                PlanEstudio[]
   directores            Usuario[]     @relation("DirectorCarrera")
   asignaturasEvaluadas  Asignatura[]  @relation("CarreraEvaluadora")
+  paadsEvaluados        PaadAnual[]
 }
 
 model PlanEstudio {
@@ -93,6 +103,11 @@ model Usuario {
   carrera             Carrera?            @relation("DirectorCarrera", fields: [carreraId], references: [id])
   planifResponsable   Planificacion[]     @relation("DocenteResponsable")
   paadsDocente        PaadDocente[]
+  paadsAnuales        PaadAnual[]
+  presentacionesPaad PresentacionPaad[]
+  equiposPlanificacion IntegrantePlanificacion[]
+  dictamenesPaad      DictamenPaad[]
+  observacionesPaad  ObservacionPaad[]
   observaciones       ItemObservacion[]   @relation("AutorObservacion")
   asignacionesCatedra AsignacionCatedra[]
   createdAt           DateTime            @default(now())
@@ -133,11 +148,91 @@ model Planificacion {
   asignatura           Asignatura        @relation(fields: [asignaturaId], references: [id])
   docenteResponsable   Usuario           @relation("DocenteResponsable", fields: [docenteResponsableId], references: [id])
   paads                PaadDocente[]
+  integrantes          IntegrantePlanificacion[]
   observaciones        ItemObservacion[]
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
   @@unique([asignaturaId, cicloLectivo])
+}
+
+// El equipo es independiente del documento personal del docente.
+model IntegrantePlanificacion {
+  id              String @id @default(uuid())
+  planificacionId String
+  docenteId       String
+  cargoEnCatedra  String
+  planificacion   Planificacion @relation(fields: [planificacionId], references: [id], onDelete: Cascade)
+  docente         Usuario @relation(fields: [docenteId], references: [id])
+
+  @@unique([planificacionId, docenteId])
+}
+
+model PaadAnual {
+  id                    String @id @default(uuid())
+  docenteId             String
+  cicloLectivo          Int
+  datosPaad             Json
+  estado                PaadStatus @default(BORRADOR)
+  carreraEvaluadoraId   String?
+  direccionManual       Boolean @default(false)
+  conflictoMigracion    Boolean @default(false)
+  fuenteLegacyId        String?
+  legacyConvertido      Boolean @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  docente               Usuario @relation(fields: [docenteId], references: [id])
+  carreraEvaluadora     Carrera? @relation(fields: [carreraEvaluadoraId], references: [id])
+  presentaciones        PresentacionPaad[]
+  observaciones         ObservacionPaad[]
+
+  @@unique([docenteId, cicloLectivo])
+}
+
+model PresentacionPaad {
+  id              String @id @default(uuid())
+  paadId          String
+  numero          Int
+  datosPaad       Json
+  autorId         String?
+  rolAutor        UserRole?
+  createdAt       DateTime @default(now())
+  paad            PaadAnual @relation(fields: [paadId], references: [id])
+  autor           Usuario? @relation(fields: [autorId], references: [id])
+  dictamenes      DictamenPaad[]
+  observaciones   ObservacionPaad[]
+
+  @@unique([paadId, numero])
+}
+
+model DictamenPaad {
+  id              String @id @default(uuid())
+  presentacionId  String
+  autorId         String
+  rolAutor        UserRole
+  resultado       String
+  comentario      String @db.Text
+  createdAt       DateTime @default(now())
+  presentacion    PresentacionPaad @relation(fields: [presentacionId], references: [id])
+  autor           Usuario @relation(fields: [autorId], references: [id])
+
+  @@unique([presentacionId, rolAutor])
+}
+
+model ObservacionPaad {
+  id                String @id @default(uuid())
+  paadId            String
+  presentacionId    String?
+  legacyId          String? @unique
+  campoPath         String
+  autorId           String
+  rolAutor          UserRole
+  mensaje           String @db.Text
+  resuelto          Boolean @default(false)
+  createdAt         DateTime @default(now())
+  paad              PaadAnual @relation(fields: [paadId], references: [id])
+  presentacion      PresentacionPaad? @relation(fields: [presentacionId], references: [id])
+  autor             Usuario @relation(fields: [autorId], references: [id])
 }
 
 model PaadDocente {

@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { PAAD_LABELS } from '@/lib/paad';
 import { notFound } from 'next/navigation';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -9,9 +11,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { StatusTimeline } from '@/components/StatusTimeline';
 import { ViewToggle } from '@/components/ViewToggle';
 import { PaacForm } from '@/components/forms/PaacForm';
-import { PaadForm } from '@/components/forms/PaadForm';
 import { PaacDocumentView } from '@/components/documents/PaacDocumentView';
-import { PaadDocumentView } from '@/components/documents/PaadDocumentView';
 import { InvitarDocenteForm } from '@/components/forms/InvitarDocenteForm';
 import { GestionEquipoModal } from '@/components/admin/GestionEquipoModal';
 import { AccionesPanel } from '@/components/forms/AccionesPanel';
@@ -21,7 +21,7 @@ import { InformeGeneralPanel } from '@/components/forms/InformeGeneralPanel';
 import { PlanificacionTabs, type TabDef } from '@/components/PlanificacionTabs';
 import { SectionCard } from '@/components/forms/fields';
 import { permiteObservaciones } from '@/lib/observaciones';
-import type { PaadData, GeneralReportData, PedagogicalReportData, DisciplinaryReportData } from '@/types/planificacion';
+import type { GeneralReportData, PedagogicalReportData, DisciplinaryReportData } from '@/types/planificacion';
 
 export default async function PlanificacionDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -42,7 +42,7 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
   const docentesDisponibles =
     esResponsable || rol === UserRole.ADMINISTRADOR
       ? await prisma.usuario.findMany({
-          where: { rol: UserRole.DOCENTE, NOT: { id: { in: planif.paads.map((p) => p.docenteId) } } },
+          where: { rol: UserRole.DOCENTE, NOT: { id: { in: planif.integrantes.map((p) => p.docenteId) } } },
           orderBy: { apellido: 'asc' },
         })
       : [];
@@ -50,23 +50,23 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
   const docentesDisponiblesAdmin =
     rol === UserRole.ADMINISTRADOR
       ? await prisma.usuario.findMany({
-          where: { rol: UserRole.DOCENTE, NOT: { id: { in: planif.paads.map((p) => p.docenteId) } } },
+          where: { rol: UserRole.DOCENTE, NOT: { id: { in: planif.integrantes.map((p) => p.docenteId) } } },
           orderBy: { apellido: 'asc' },
         })
       : [];
 
   const pendientesPaac = planif.observaciones.filter((o) => o.documentoTipo === 'PAAC' && !o.resuelto).length;
-  const pendientesPaad = planif.observaciones.filter((o) => o.documentoTipo === 'PAAD' && !o.resuelto).length;
+  const paadsAnuales = await prisma.paadAnual.findMany({ where: { cicloLectivo: planif.cicloLectivo, docenteId: { in: planif.integrantes.map(p => p.docenteId) } }, include: { presentaciones: { select: { id: true } } } });
 
   const informePedagogico = planif.informePedagogico as unknown as PedagogicalReportData | null;
   const informeDisciplinar = planif.informeDisciplinar as unknown as DisciplinaryReportData | null;
   const informeGeneral = planif.informeGeneral as unknown as GeneralReportData | null;
 
-  const equipoPaadResumen = planif.paads.map((p) => ({
+  const equipoPaadResumen = planif.integrantes.map((p) => ({
     docenteId: p.docenteId,
     nombre: `${p.docente.nombre} ${p.docente.apellido}`,
     cargo: p.cargoEnCatedra,
-    estado: p.estadoPresento,
+    estado: paadsAnuales.find(a => a.docenteId === p.docenteId)?.presentaciones.length ? 'PRESENTO' : 'NO_PRESENTO',
   }));
 
   const tabs: TabDef[] = [
@@ -103,59 +103,25 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
       ),
     },
     {
-      key: 'PAAD',
-      label: `PAAD (${planif.paads.length})`,
-      pendientes: pendientesPaad,
+      key: 'EQUIPO',
+      label: 'Equipo y PAAD',
       content: (
-        <ViewToggle
-          form={
-            <div>
-              {(esResponsable || rol === UserRole.ADMINISTRADOR) && ['BORRADOR', 'OBSERVADO'].includes(planif.estado) && (
-                <div className="mb-4">
-                  <InvitarDocenteForm planificacionId={planif.id} docentes={docentesDisponibles} />
-                </div>
-              )}
-
-              <div className="space-y-4">
-                {planif.paads.map((paad) => {
-                  const puedeEditarEstePaad =
-                    estadoPermiteCorreccion &&
-                    (session.user.id === paad.docenteId || rol === UserRole.ADMINISTRADOR);
-                  return (
-                    <PaadForm
-                      key={paad.id}
-                      planificacionId={planif.id}
-                      paadId={paad.id}
-                      docenteId={paad.docenteId}
-                      docenteNombre={`${paad.docente.nombre} ${paad.docente.apellido}`}
-                      cargoEnCatedra={paad.cargoEnCatedra}
-                      estadoPresento={paad.estadoPresento}
-                      data={paad.datosPaad as unknown as PaadData}
-                      editable={puedeEditarEstePaad}
-                      canObserve={canObserve}
-                      canResolve={canResolveObs}
-                      observaciones={planif.observaciones.filter((o) => o.documentoTipo === 'PAAD')}
-                    />
-                  );
-                })}
-                {planif.paads.length === 0 && <p className="text-sm text-gray-500">Aún no se agregó ningún docente al equipo.</p>}
-              </div>
-            </div>
-          }
-          document={
-            <div className="space-y-6">
-              {planif.paads.map((paad) => (
-                <PaadDocumentView
-                  key={paad.id}
-                  data={paad.datosPaad as unknown as PaadData}
-                  docenteNombre={`${paad.docente.nombre} ${paad.docente.apellido}`}
-                  cargo={paad.cargoEnCatedra}
-                />
-              ))}
-              {planif.paads.length === 0 && <p className="text-sm text-gray-500">Aún no se agregó ningún docente al equipo.</p>}
-            </div>
-          }
-        />
+        <SectionCard title="Presentación del PAAD anual por docente">
+          <p className="text-sm text-gray-400 mb-4">El PAAD es personal. Su presentación no bloquea el envío ni la aprobación de este PAAC.</p>
+          {(esResponsable || rol === UserRole.ADMINISTRADOR) && ['BORRADOR', 'OBSERVADO'].includes(planif.estado) &&
+            <InvitarDocenteForm planificacionId={planif.id} docentes={docentesDisponibles} />}
+          <div className="space-y-3 mt-4">
+            {planif.integrantes.map(p => {
+              const anual = paadsAnuales.find(a => a.docenteId === p.docenteId);
+              return <div key={p.id} className="border border-border rounded-lg p-3 text-sm">
+                <p>{p.docente.nombre} {p.docente.apellido} · {p.cargoEnCatedra}</p>
+                <p className="text-gray-400">{anual?.presentaciones.length ? 'Presentado' : 'Pendiente de presentar'} · {anual ? PAAD_LABELS[anual.estado] : 'Sin PAAD habilitado'}</p>
+                {anual && rol !== UserRole.CONSEJO_DEPARTAMENTAL &&
+                  <Link className="text-primary" href={'/paads/' + anual.id}>Ver PAAD anual</Link>}
+              </div>;
+            })}
+          </div>
+        </SectionCard>
       ),
     },
     {
@@ -224,7 +190,7 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
           <GestionEquipoModal
             planificacionId={planif.id}
             docenteResponsableId={planif.docenteResponsableId}
-            equipo={planif.paads.map((p) => ({
+            equipo={planif.integrantes.map((p) => ({
               paadId: p.id,
               docenteId: p.docenteId,
               nombre: `${p.docente.nombre} ${p.docente.apellido}`,

@@ -8,13 +8,14 @@ import type {
 } from '../src/types/planificacion';
 import { ISI_CATEDRAS } from './isi-catedras';
 import { generarPlanificacionesDelCiclo } from '../src/lib/generar-planificaciones';
-import { defaultPaad } from '../src/lib/defaults';
+import { migrarPaads } from '../src/lib/migrar-paad';
+import { asegurarPaad } from '../src/lib/paad';
 
 const prisma = new PrismaClient();
 
 async function main() {
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE "ItemObservacion", "PaadDocente", "Planificacion", "Asignatura", "PlanEstudio", "Usuario", "Carrera", "Departamento", "Sede" CASCADE;`
+    `TRUNCATE TABLE "ObservacionPaad", "DictamenPaad", "PresentacionPaad", "PaadAnual", "IntegrantePlanificacion", "AsignacionCatedra", "ItemObservacion", "PaadDocente", "Planificacion", "Asignatura", "PlanEstudio", "Usuario", "Carrera", "Departamento", "Sede" CASCADE;`
   );
 
   const passwordHash = await bcrypt.hash('unlar2026', 10);
@@ -666,32 +667,9 @@ async function main() {
   // ejemplo de Programación I se conserva sin cambios.
   const generacion = await generarPlanificacionesDelCiclo(prisma, 2026);
   planificacionesIsiImportadas = generacion.creadas;
-  const asignaturasIsi = await prisma.asignatura.findMany({
-    where: { planEstudioId: planIsiNuevo.id },
-    include: { asignacionesCatedra: { where: { cicloLectivo: 2026 }, orderBy: { createdAt: 'asc' } } },
-  });
-  for (const asignatura of asignaturasIsi) {
-    const equipo = asignatura.asignacionesCatedra;
-    if (!equipo.length) continue;
-    const existente = await prisma.planificacion.findUnique({
-      where: { asignaturaId_cicloLectivo: { asignaturaId: asignatura.id, cicloLectivo: 2026 } },
-    });
-    const planificacionId = existente?.id;
-    if (!planificacionId) throw new Error(`No se pudo determinar la planificación de ${asignatura.nombre}.`);
-    for (const integrante of equipo) {
-      await prisma.paadDocente.upsert({
-        where: { planificacionId_docenteId: { planificacionId, docenteId: integrante.docenteId } },
-        update: { cargoEnCatedra: integrante.categoria },
-        create: {
-          planificacionId,
-          docenteId: integrante.docenteId,
-          cargoEnCatedra: integrante.categoria,
-          estadoPresento: 'NO_PRESENTO',
-          datosPaad: defaultPaad() as any,
-        },
-      });
-    }
-  }
+  await migrarPaads(prisma);
+  const docentesAnuales = await prisma.usuario.findMany({ where: { rol: 'DOCENTE' }, select: { id: true } });
+  for (const docente of docentesAnuales) await asegurarPaad(prisma, docente.id, 2026);
 
   console.log('Seed ejecutado con éxito.');
   console.log(`Carga ISI: ${materiasIsiImportadas} materias nuevas, ${docentesIsiImportados} docentes nuevos, ${asignacionesIsiImportadas} asignaciones 2026 y ${planificacionesIsiImportadas} planificaciones borrador.`);

@@ -29,17 +29,16 @@ export function InformeDisciplinarPanel({
     ['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR'].includes(estado) &&
     hasRole(rol, [UserRole.DIRECCION_CARRERA, UserRole.ADMINISTRADOR]);
 
+  const controlActual: DisciplinaryReportData['controlPaad'] = equipoPaad.map(p => ({
+    docenteId: p.docenteId, nombreDocente: p.nombre, cargo: p.cargo as DocentCategory,
+    estado: p.estado === 'PRESENTO' ? 'PRESENTO' : 'NO_PRESENTO',
+  }));
   const [disciplinar, setDisciplinar] = useState<DisciplinaryReportData>(
     informeDisciplinar ?? {
       contenidos: 'CUMPLE',
       trabajosPracticos: { tp: 'ACORDE', laboratorio: 'NO_APLICA', campo: 'NO_APLICA' },
       bibliografia: { basica: 'PRESENTA', complementaria: 'PRESENTA' },
-      controlPaad: equipoPaad.map((p) => ({
-        docenteId: p.docenteId,
-        nombreDocente: p.nombre,
-        cargo: p.cargo as DocentCategory,
-        estado: p.estado === 'PRESENTO' ? 'PRESENTO' : 'NO_PRESENTO',
-      })),
+      controlPaad: controlActual,
       dictamen: 'CUMPLE',
       observaciones: '',
     }
@@ -83,9 +82,9 @@ export function InformeDisciplinarPanel({
           {informeDisciplinar.observaciones && <KeyValueRow label="Observaciones" value={informeDisciplinar.observaciones} />}
         </dl>
         <div className="mt-3">
-          <p className="text-xs text-gray-500 mb-2">Control de presentación de PAAD por docente</p>
+          <p className="text-xs text-gray-500 mb-2">Control actual de PAAD (informativo, no bloquea el PAAC)</p>
           <div className="space-y-1">
-            {informeDisciplinar.controlPaad.map((c) => (
+            {controlActual.map((c) => (
               <div key={c.docenteId} className="flex items-center justify-between text-sm border border-border rounded-lg px-3 py-2">
                 <span>
                   {c.nombreDocente} <span className="text-gray-500">({c.cargo})</span>
@@ -95,6 +94,10 @@ export function InformeDisciplinarPanel({
             ))}
           </div>
         </div>
+        <details className="mt-3 text-sm">
+          <summary className="cursor-pointer">Control guardado al emitir el informe (antecedente)</summary>
+          {informeDisciplinar.controlPaad.map(c => <p key={c.docenteId}>{c.nombreDocente}: {c.estado}</p>)}
+        </details>
       </SectionCard>
     );
   }
@@ -161,9 +164,9 @@ export function InformeDisciplinarPanel({
       </div>
 
       <div>
-        <p className="text-xs text-gray-500 mb-2">Control de presentación de PAAD por docente</p>
+        <p className="text-xs text-gray-500 mb-2">Control actual de PAAD (informativo, no bloquea el PAAC)</p>
         <div className="space-y-1">
-          {disciplinar.controlPaad.map((c) => (
+          {controlActual.map((c) => (
             <div key={c.docenteId} className="flex items-center justify-between text-sm border border-border rounded-lg px-3 py-2">
               <span>
                 {c.nombreDocente} <span className="text-gray-500">({c.cargo})</span>
@@ -194,7 +197,7 @@ export function InformeDisciplinarPanel({
       <button
         type="button"
         disabled={pending}
-        onClick={() => run(() => registrarAprobacionDisciplinar(planificacionId, disciplinar))}
+        onClick={() => run(() => registrarAprobacionDisciplinar(planificacionId, { ...disciplinar, controlPaad: controlActual }))}
         className={`text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50 transition-colors ${
           disciplinar.dictamen === 'CUMPLE' ? 'bg-success/80 hover:bg-success' : 'bg-danger/80 hover:bg-danger'
         }`}

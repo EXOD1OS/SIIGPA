@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { defaultPaad } from '@/lib/defaults';
+import { asegurarPaad } from '@/lib/paad';
 import { generarPlanificacionesDelCiclo } from '@/lib/generar-planificaciones';
 import { UserRole } from '@prisma/client';
 
@@ -95,20 +95,21 @@ export async function crearUsuario(input: {
         },
       });
       if (planificacionId) {
-        await tx.paadDocente.create({
+        await tx.integrantePlanificacion.create({
           data: {
             planificacionId,
             docenteId: creado.id,
             cargoEnCatedra: asignacion.categoria,
-            datosPaad: defaultPaad() as any,
           },
         });
       }
     }
 
+    if (creado.rol === UserRole.DOCENTE) await asegurarPaad(tx, creado.id, asignacion?.cicloLectivo ?? new Date().getFullYear());
     return { usuario: creado, planificacionId };
   });
 
+  revalidatePath('/paads', 'layout');
   revalidatePath('/admin/usuarios');
   if (input.asignacionInicial) {
     revalidatePath('/admin');
@@ -121,6 +122,8 @@ export async function crearUsuario(input: {
 export async function generarPlanificaciones(cicloLectivo: number) {
   await requireAdmin();
   const resultado = await generarPlanificacionesDelCiclo(prisma, cicloLectivo);
+  revalidatePath('/paads', 'layout');
+  revalidatePath('/mi-paad');
   revalidatePath('/admin');
   revalidatePath('/planificaciones');
   revalidatePath('/dashboard');
@@ -131,46 +134,61 @@ export async function generarPlanificaciones(cicloLectivo: number) {
 // Equipo de Cátedra (roster independiente de la Planificacion)
 // ============================================================================
 
-export async function agregarIntegranteCatedra(input: {
-  asignaturaId: string;
-  cicloLectivo: number;
-  docenteId: string;
-  categoria: string;
-}) {
+async function planificacionEditableEquipo(tx: import('@prisma/client').Prisma.TransactionClient, asignaturaId: string, cicloLectivo: number) {
+  const planificacion = await tx.planificacion.findUnique({ where: { asignaturaId_cicloLectivo: { asignaturaId, cicloLectivo } } });
+  if (planificacion && !['BORRADOR', 'OBSERVADO'].includes(planificacion.estado)) {
+    throw new Error('El equipo de una planificación en revisión o aprobada no puede modificarse.');
+  }
+  return planificacion;
+}
+
+export async function agregarIntegranteCatedra(input: { asignaturaId: string; cicloLectivo: number; docenteId: string; categoria: string }) {
   await requireAdmin();
-
-  const asignacion = await prisma.asignacionCatedra.upsert({
-    where: {
-      asignaturaId_cicloLectivo_docenteId: {
-        asignaturaId: input.asignaturaId,
-        cicloLectivo: input.cicloLectivo,
-        docenteId: input.docenteId,
-      },
-    },
-    update: { categoria: input.categoria },
-    create: {
-      asignaturaId: input.asignaturaId,
-      cicloLectivo: input.cicloLectivo,
-      docenteId: input.docenteId,
-      categoria: input.categoria,
-    },
+  if (!CATEGORIAS_DOCENTES.includes(input.categoria)) throw new Error('Categoría inválida.');
+  const asignacion = await prisma.$transaction(async tx => {
+    const planificacion = await planificacionEditableEquipo(tx, input.asignaturaId, input.cicloLectivo);
+    const creado = await tx.asignacionCatedra.upsert({
+      where: { asignaturaId_cicloLectivo_docenteId: { asignaturaId: input.asignaturaId, cicloLectivo: input.cicloLectivo, docenteId: input.docenteId } },
+      create: input, update: { categoria: input.categoria },
+    });
+    if (planificacion) await tx.integrantePlanificacion.upsert({
+      where: { planificacionId_docenteId: { planificacionId: planificacion.id, docenteId: input.docenteId } },
+      create: { planificacionId: planificacion.id, docenteId: input.docenteId, cargoEnCatedra: input.categoria },
+      update: { cargoEnCatedra: input.categoria },
+    });
+    await asegurarPaad(tx, input.docenteId, input.cicloLectivo);
+    return creado;
   });
-
-  revalidatePath('/admin');
+  revalidatePath('/admin'); revalidatePath('/paads', 'layout'); revalidatePath('/planificaciones', 'layout');
   return asignacion;
 }
 
 export async function actualizarCategoriaIntegrante(asignacionId: string, categoria: string) {
   await requireAdmin();
-  const asignacion = await prisma.asignacionCatedra.update({ where: { id: asignacionId }, data: { categoria } });
-  revalidatePath('/admin');
+  if (!CATEGORIAS_DOCENTES.includes(categoria)) throw new Error('Categoría inválida.');
+  const asignacion = await prisma.$transaction(async tx => {
+    const actual = await tx.asignacionCatedra.findUniqueOrThrow({ where: { id: asignacionId } });
+    const planificacion = await planificacionEditableEquipo(tx, actual.asignaturaId, actual.cicloLectivo);
+    if (planificacion) await tx.integrantePlanificacion.updateMany({
+      where: { planificacionId: planificacion.id, docenteId: actual.docenteId }, data: { cargoEnCatedra: categoria },
+    });
+    return tx.asignacionCatedra.update({ where: { id: asignacionId }, data: { categoria } });
+  });
+  revalidatePath('/admin'); revalidatePath('/planificaciones', 'layout');
   return asignacion;
 }
 
 export async function desvincularIntegrante(asignacionId: string) {
   await requireAdmin();
-  await prisma.asignacionCatedra.delete({ where: { id: asignacionId } });
-  revalidatePath('/admin');
+  await prisma.$transaction(async tx => {
+    const actual = await tx.asignacionCatedra.findUniqueOrThrow({ where: { id: asignacionId } });
+    const planificacion = await planificacionEditableEquipo(tx, actual.asignaturaId, actual.cicloLectivo);
+    if (actual.esResponsable || planificacion?.docenteResponsableId === actual.docenteId) throw new Error('Cambiá el responsable antes de quitarlo.');
+    if (planificacion) await tx.integrantePlanificacion.deleteMany({ where: { planificacionId: planificacion.id, docenteId: actual.docenteId } });
+    await tx.asignacionCatedra.delete({ where: { id: asignacionId } });
+    await asegurarPaad(tx, actual.docenteId, actual.cicloLectivo);
+  });
+  revalidatePath('/admin'); revalidatePath('/paads', 'layout'); revalidatePath('/planificaciones', 'layout');
 }
 
 export async function designarResponsable(asignaturaId: string, cicloLectivo: number, asignacionId: string) {
@@ -189,13 +207,17 @@ export async function designarResponsable(asignaturaId: string, cicloLectivo: nu
     await tx.asignacionCatedra.updateMany({ where: { asignaturaId, cicloLectivo }, data: { esResponsable: false } });
     await tx.asignacionCatedra.update({ where: { id: asignacionId }, data: { esResponsable: true } });
     if (planificacion) {
+      await tx.integrantePlanificacion.upsert({ where: { planificacionId_docenteId: { planificacionId: planificacion.id, docenteId: integrante.docenteId } }, update: { cargoEnCatedra: integrante.categoria }, create: { planificacionId: planificacion.id, docenteId: integrante.docenteId, cargoEnCatedra: integrante.categoria } });
       await tx.planificacion.update({
         where: { id: planificacion.id },
         data: { docenteResponsableId: integrante.docenteId },
       });
     }
+    await asegurarPaad(tx, integrante.docenteId, cicloLectivo);
   });
 
   revalidatePath('/admin');
-  revalidatePath('/planificaciones');
+  revalidatePath('/planificaciones', 'layout');
+  revalidatePath('/paads', 'layout');
+  revalidatePath('/mi-paad');
 }

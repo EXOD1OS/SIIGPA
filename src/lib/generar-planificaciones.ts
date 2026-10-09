@@ -1,5 +1,6 @@
 import { Prisma, PrismaClient } from '@prisma/client';
-import { defaultPaacCompetencias, defaultPaacTraditional, defaultPaad } from './defaults';
+import { defaultPaacCompetencias, defaultPaacTraditional } from './defaults';
+import { asegurarPaad } from './paad';
 import type { DocentCategory, PaacCompetenciasData, PaacTraditionalData } from '@/types/planificacion';
 
 export async function generarPlanificacionesDelCiclo(prisma: PrismaClient, cicloLectivo: number) {
@@ -100,18 +101,18 @@ export async function generarPlanificacionesDelCiclo(prisma: PrismaClient, ciclo
       }
       const existente = await tx.planificacion.findUnique({
         where: { asignaturaId_cicloLectivo: { asignaturaId: asignatura.id, cicloLectivo } },
-        select: { id: true },
+        select: { id: true, estado: true },
       });
       if (existente) {
+        if (!['BORRADOR', 'OBSERVADO'].includes(existente.estado)) return false;
         for (const integrante of equipo) {
-          await tx.paadDocente.upsert({
+          await tx.integrantePlanificacion.upsert({
             where: { planificacionId_docenteId: { planificacionId: existente.id, docenteId: integrante.docenteId } },
             update: { cargoEnCatedra: integrante.categoria },
             create: {
               planificacionId: existente.id,
               docenteId: integrante.docenteId,
               cargoEnCatedra: integrante.categoria,
-              datosPaad: defaultPaad() as unknown as Prisma.InputJsonValue,
             },
           });
         }
@@ -125,11 +126,10 @@ export async function generarPlanificacionesDelCiclo(prisma: PrismaClient, ciclo
           docenteResponsableId: responsable.docenteId,
           estado: 'BORRADOR',
           datosPaac: datosPaac as unknown as Prisma.InputJsonValue,
-          paads: {
+          integrantes: {
             create: equipo.map((integrante) => ({
               docenteId: integrante.docenteId,
               cargoEnCatedra: integrante.categoria,
-              datosPaad: defaultPaad() as unknown as Prisma.InputJsonValue,
             })),
           },
         },
@@ -146,5 +146,7 @@ export async function generarPlanificacionesDelCiclo(prisma: PrismaClient, ciclo
     }
   }
 
+  const docentes = await prisma.usuario.findMany({ where: { rol: 'DOCENTE' }, select: { id: true } });
+  for (const docente of docentes) await asegurarPaad(prisma, docente.id, cicloLectivo);
   return resultado;
 }

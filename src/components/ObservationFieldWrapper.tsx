@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { observarPaad, resolverObservacionPaad } from '@/actions/paad.actions';
 import { agregarObservacion, resolverObservacion } from '@/actions/planificacion.actions';
 
 interface Observacion {
@@ -11,7 +12,9 @@ interface Observacion {
 }
 
 interface Props {
-  planificacionId: string;
+  planificacionId?: string;
+  paadAnualId?: string;
+  presentacionId?: string;
   documentoTipo: 'PAAC' | 'PAAD';
   docentePaadId?: string;
   fieldPath: string;
@@ -23,6 +26,8 @@ interface Props {
 
 export function ObservationFieldWrapper({
   planificacionId,
+  paadAnualId,
+  presentacionId,
   documentoTipo,
   docentePaadId,
   fieldPath,
@@ -31,6 +36,7 @@ export function ObservationFieldWrapper({
   canResolve = false,
   children,
 }: Props) {
+  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [mensaje, setMensaje] = useState('');
   const [pending, startTransition] = useTransition();
@@ -41,7 +47,12 @@ export function ObservationFieldWrapper({
   function submitObservacion() {
     if (!mensaje.trim()) return;
     startTransition(async () => {
-      await agregarObservacion({ planificacionId, documentoTipo, campoPath: fieldPath, mensaje, docentePaadId });
+      setError(null);
+      try {
+        if (paadAnualId && presentacionId) await observarPaad({ paadId: paadAnualId, presentacionId, campoPath: fieldPath, mensaje });
+        else if (planificacionId) await agregarObservacion({ planificacionId, documentoTipo, campoPath: fieldPath, mensaje, docentePaadId });
+        else throw new Error('Documento no disponible.');
+      } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo registrar la observación.'); return; }
       setMensaje('');
       setOpen(false);
     });
@@ -50,6 +61,7 @@ export function ObservationFieldWrapper({
   return (
     <div className={`p-2 rounded-lg transition-colors ${hasObs ? 'bg-red-950/10 ring-1 ring-danger/30' : ''}`}>
       {children}
+      {error && <p className="text-xs text-danger">{error}</p>}
 
       {canObserve && !open && (
         <button
@@ -106,7 +118,7 @@ export function ObservationFieldWrapper({
                 <button
                   type="button"
                   disabled={pending}
-                  onClick={() => startTransition(async () => { await resolverObservacion(obs.id); })}
+                  onClick={() => startTransition(async () => { try { if (paadAnualId) await resolverObservacionPaad(obs.id); else await resolverObservacion(obs.id); } catch (e) { setError(e instanceof Error ? e.message : 'No se pudo resolver.'); } })}
                   className="ml-2 text-emerald-400 hover:underline whitespace-nowrap"
                 >
                   Marcar resuelto
