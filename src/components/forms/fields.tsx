@@ -225,9 +225,9 @@ export function EmptyState({ message }: { message: string }) {
   return <p className="text-sm text-gray-500 bg-surface border border-dashed border-border rounded-xl p-5">{message}</p>;
 }
 
-export function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+export function SectionCard({ title, children, className = '' }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <div className="bg-surface border border-border rounded-xl p-5 space-y-4">
+    <div className={`rounded-xl border p-4 space-y-4 sm:p-5 ${className || 'bg-surface border-border'}`}>
       <h3 className="text-sm font-semibold text-white">{title}</h3>
       {children}
     </div>

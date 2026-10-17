@@ -9,9 +9,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (session.user.mustChangePassword) redirect('/cambiar-password');
 
   return (
-    <div className="flex">
+    <div className="flex min-h-screen flex-col xl:flex-row">
       <Sidebar nombre={session.user.name ?? ''} rol={session.user.rol} />
-      <main className="flex-1 min-w-0 min-h-screen px-8 py-8">{children}</main>
+      <main className="min-h-screen min-w-0 flex-1 px-4 py-5 sm:px-6 sm:py-7 xl:px-8 xl:py-8">{children}</main>
     </div>
   );
 }

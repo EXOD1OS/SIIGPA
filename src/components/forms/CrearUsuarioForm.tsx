@@ -71,7 +71,7 @@ export function CrearUsuarioForm({
   return (
     <SectionCard title="Nuevo usuario">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
           <TextField label="Nombre" value={nombre} onChange={setNombre} />
           <TextField label="Apellido" value={apellido} onChange={setApellido} />
           <TextField label="Email institucional" value={email} onChange={setEmail} />
@@ -93,7 +93,7 @@ export function CrearUsuarioForm({
         </div>
 
         {rol === UserRole.DOCENTE && (
-          <div className="space-y-3 border border-border rounded-lg p-3">
+          <div className="space-y-3 rounded-xl border border-blue-100/10 bg-[#09172b]/60 p-3 sm:p-4">
             <SelectField
               label="Materia inicial (opcional)"
               value={asignaturaId}
@@ -120,7 +120,7 @@ export function CrearUsuarioForm({
                 />
               </div>
             )}
-            <p className="text-xs text-gray-500">Podés asignar más materias y designar al responsable desde Gestión Académica.</p>
+            <p className="text-xs leading-5 text-slate-500">Podés asignar más materias y designar a la persona responsable desde Gestión Académica.</p>
           </div>
         )}
 
@@ -130,7 +130,7 @@ export function CrearUsuarioForm({
         <button
           type="submit"
           disabled={loading}
-          className="bg-primary hover:bg-primary-hover transition-colors text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50"
+          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-300/20 bg-blue-500/15 px-5 py-2 text-sm font-semibold text-blue-100 transition hover:border-blue-300/40 hover:bg-blue-500/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 disabled:cursor-wait disabled:opacity-50"
         >
           {loading ? 'Creando...' : 'Crear usuario'}
         </button>

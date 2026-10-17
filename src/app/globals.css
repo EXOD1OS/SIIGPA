@@ -34,14 +34,53 @@ select:focus {
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+  html,
+  body {
+    width: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  body * {
+    visibility: hidden !important;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible !important;
+  }
   .no-print {
     display: none !important;
   }
-  body {
-    background: white !important;
-  }
   .print-area {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
     box-shadow: none !important;
     border: none !important;
+    border-radius: 0 !important;
+    color: #111827 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .doc-section {
+    break-inside: avoid;
+  }
+  .print-area table {
+    page-break-inside: auto;
+  }
+  .print-area thead {
+    display: table-header-group;
+  }
+  .print-area tr {
+    break-inside: avoid;
   }
 }

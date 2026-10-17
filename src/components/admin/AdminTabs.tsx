@@ -12,21 +12,22 @@ export function AdminTabs() {
   const pathname = usePathname();
 
   return (
-    <div className="flex gap-1 border-b border-border overflow-x-auto">
+    <nav aria-label="Secciones de administración" className="inline-flex max-w-full gap-1 overflow-x-auto rounded-xl border border-white/[0.08] bg-slate-950/40 p-1">
       {TABS.map((tab) => {
         const active = tab.href === '/admin' ? pathname === '/admin' : pathname.startsWith(tab.href);
         return (
           <Link
             key={tab.href}
             href={tab.href}
-            className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
-              active ? 'border-primary text-primary' : 'border-transparent text-gray-400 hover:text-gray-200'
+            aria-current={active ? 'page' : undefined}
+            className={`rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors sm:px-4 sm:text-sm ${
+              active ? 'bg-primary/15 text-blue-100 shadow-inner shadow-blue-950/20' : 'text-gray-400 hover:bg-white/[0.05] hover:text-gray-100'
             }`}
           >
             {tab.label}
           </Link>
         );
       })}
-    </div>
+    </nav>
   );
 }

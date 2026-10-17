@@ -45,12 +45,13 @@ export function TreeItem({
         type="button"
         onClick={handleClick}
         aria-expanded={hasChildren ? open : undefined}
-        className={`group flex items-center gap-2 w-full text-left text-sm px-2.5 py-1.5 rounded-lg border transition-colors duration-150 ${
+        aria-current={active ? 'true' : undefined}
+        className={`group flex min-h-9 w-full items-center gap-2 rounded-xl border px-2.5 py-2 text-left text-xs transition-colors duration-150 sm:text-sm ${
           active
-            ? 'bg-primary/15 border-primary/40 text-primary font-medium'
+            ? 'bg-primary/15 border-primary/40 text-blue-100 font-semibold shadow-sm shadow-blue-950/20'
             : hasChildren
-              ? 'bg-white/[0.03] border-border/60 hover:bg-primary/10 hover:border-primary/40 text-gray-200 font-medium'
-              : 'border-transparent text-gray-400 hover:bg-background/60 hover:text-gray-200'
+              ? 'bg-white/[0.035] border-white/[0.08] hover:bg-primary/10 hover:border-primary/35 text-gray-200 font-medium'
+              : 'border-transparent text-gray-400 hover:bg-white/[0.04] hover:text-gray-100'
         }`}
       >
         {hasChildren ? (
@@ -65,7 +66,7 @@ export function TreeItem({
 
         <span className="flex-1 truncate">{label}</span>
 
-        {badge && <span className="shrink-0 text-[10px] text-gray-500">{badge}</span>}
+        {badge && <span className="shrink-0 rounded-md border border-white/[0.07] bg-black/10 px-1.5 py-0.5 text-[9px] text-gray-400 sm:text-[10px]">{badge}</span>}
 
         {hasChildren && (
           <span
