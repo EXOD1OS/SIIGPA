@@ -9,6 +9,7 @@ import { hasRole } from '@/lib/roles';
 import { asegurarPaad } from '@/lib/paad';
 import { planificacionVisiblePara } from '@/lib/visibilidad';
 import { permiteObservaciones, tieneObservacionesPendientes } from '@/lib/observaciones';
+import { archivarExpedienteFinal } from '@/lib/archivo-expediente';
 import type {
   PaacData,
   PedagogicalReportData,
@@ -389,14 +390,24 @@ export async function formalizarResolucion(planifId: string, nroResolucion: stri
   if (!nroResolucion.trim()) throw new Error('El número de resolución es obligatorio.');
   if (planif.numeroResolucion) throw new Error('Ya hay una resolución asignada.');
 
-  const updated = await prisma.planificacion.update({
-    where: { id: planifId },
-    data: {
-      numeroResolucion: nroResolucion,
-      fechaAprobacionCd: new Date(),
-      estado: 'FINALIZADO',
-    },
-  });
+  const fechaAprobacion = new Date();
+  const updated = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Planificacion" WHERE id = ${planifId} FOR UPDATE`;
+    const actual = await tx.planificacion.findUniqueOrThrow({ where: { id: planifId } });
+    if (actual.estado !== 'ELEVADO_AL_CONSEJO') throw new Error('La planificación ya no está elevada al consejo.');
+    if (!actual.numeroExpediente) throw new Error('Primero hay que asignar el número de expediente.');
+    if (actual.numeroResolucion) throw new Error('Ya hay una resolución asignada.');
+
+    await archivarExpedienteFinal(tx, planifId, actual.numeroExpediente, nroResolucion.trim(), fechaAprobacion);
+    return tx.planificacion.update({
+      where: { id: planifId },
+      data: {
+        numeroResolucion: nroResolucion.trim(),
+        fechaAprobacionCd: fechaAprobacion,
+        estado: 'FINALIZADO',
+      },
+    });
+  }, { maxWait: 10_000, timeout: 120_000 });
 
   revalidatePlanif(planifId);
   return updated;

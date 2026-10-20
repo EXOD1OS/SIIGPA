@@ -35,6 +35,14 @@ enum PaadStatus {
   APROBADO
 }
 
+enum ArchivoExpedienteTipo {
+  PAAC
+  PAAD
+  INFORME_PEDAGOGICO
+  INFORME_DISCIPLINAR
+  INFORME_GENERAL
+}
+
 model Sede {
   id        String    @id @default(uuid())
   nombre    String
@@ -150,10 +158,28 @@ model Planificacion {
   paads                PaadDocente[]
   integrantes          IntegrantePlanificacion[]
   observaciones        ItemObservacion[]
+  archivosExpediente   ArchivoExpediente[]
   createdAt            DateTime          @default(now())
   updatedAt            DateTime          @updatedAt
 
   @@unique([asignaturaId, cicloLectivo])
+}
+
+model ArchivoExpediente {
+  id              String                 @id @default(uuid())
+  planificacionId String
+  tipo            ArchivoExpedienteTipo
+  docenteId       String?
+  nombreArchivo   String
+  objectKey       String                 @unique
+  checksumSha256  String
+  sizeBytes       Int
+  contentType     String                 @default("application/pdf")
+  createdAt       DateTime               @default(now())
+  planificacion   Planificacion          @relation(fields: [planificacionId], references: [id], onDelete: Cascade)
+
+  @@index([planificacionId, tipo])
+  @@index([planificacionId, docenteId])
 }
 
 // El equipo es independiente del documento personal del docente.

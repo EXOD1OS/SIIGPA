@@ -18,6 +18,7 @@ import { AccionesPanel } from '@/components/forms/AccionesPanel';
 import { InformePedagogicoPanel } from '@/components/forms/InformePedagogicoPanel';
 import { InformeDisciplinarPanel } from '@/components/forms/InformeDisciplinarPanel';
 import { InformeGeneralPanel } from '@/components/forms/InformeGeneralPanel';
+import { ArchivoExpedientePanel } from '@/components/forms/ArchivoExpedientePanel';
 import { PlanificacionTabs, type TabDef } from '@/components/PlanificacionTabs';
 import { SectionCard } from '@/components/forms/fields';
 import { permiteObservaciones } from '@/lib/observaciones';
@@ -212,6 +213,8 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
           numeroResolucion={planif.numeroResolucion}
         />
       </div>
+
+      <ArchivoExpedientePanel planificacionId={planif.id} estado={planif.estado} />
 
       <PlanificacionTabs tabs={tabs} />
 

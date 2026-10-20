@@ -20,7 +20,7 @@ Ord. HCS 448/2011.
    Copy-Item .env.example .env
    ```
 
-2. Levantar PostgreSQL (requiere Docker Desktop corriendo):
+2. Levantar PostgreSQL (requiere Docker Engine en ejecución; Docker Desktop es opcional si usas el Engine de WSL):
 
    ```powershell
    docker compose up -d
@@ -84,6 +84,25 @@ BORRADOR → ENVIADO_A_REVISION → (UAP / Dirección evalúan)
   Consejo Departamental (Anexo II).
 - **Consejo Departamental**: formaliza con número de expediente y resolución, cerrando el ciclo.
 - **Administrador**: crea las planificaciones de cada ciclo lectivo y siembra la estructura académica.
+
+## Archivado de documentos PDF
+
+Al formalizar el expediente y pasar la planificación a `FINALIZADO`, la aplicación genera y archiva el PAAC,
+cada PAAD anual aprobado de los docentes del equipo y los tres informes (Pedagógico, Disciplinar y General)
+en un almacenamiento privado compatible con S3, como MinIO AIStor. Los PAAD que no estén aprobados se
+omiten y no impiden finalizar la planificación. El estado final solo se registra si el almacenamiento y el
+índice de archivos en PostgreSQL se completan correctamente.
+
+Configura en `.env.local` las variables `S3_ENDPOINT`, `S3_REGION`, `S3_BUCKET`, `S3_ACCESS_KEY_ID` y
+`S3_SECRET_ACCESS_KEY`. Crea previamente el bucket y asigna al usuario de la aplicación permisos de listar
+el bucket y leer/subir objetos dentro de él. No uses la cuenta root de MinIO desde la aplicación ni guardes
+credenciales en Git. `S3_ENDPOINT` debe ser accesible desde el servidor Next.js; al mover MinIO a otro
+servidor o usar otro servicio compatible con S3, se cambia la configuración y no el flujo de la aplicación.
+Las descargas pasan por una ruta autenticada de la aplicación y no requieren exponer el bucket públicamente.
+
+`EXPEDIENTE_PDF_TIPOS` permite elegir qué documentos archivar, separado por comas: `PAAC`, `PAAD`,
+`INFORME_PEDAGOGICO`, `INFORME_DISCIPLINAR` e `INFORME_GENERAL`. Si no se define, se archivan todos.
+Los archivos y su checksum quedan indexados en PostgreSQL; el contenido binario permanece en el bucket.
 
 ## PAAD personal y actualización de bases existentes
 
