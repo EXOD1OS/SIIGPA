@@ -11,5 +11,19 @@ services:
     volumes:
       - siga_pg_data:/var/lib/postgresql/data
 
+  minio:
+    image: quay.io/minio/aistor/minio:latest
+    restart: unless-stopped
+    env_file:
+      - ../../../minio/root.env
+    command: minio server /data --license /minio.license --console-address ":9001"
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - siga_minio_data:/data
+      - ../../../minio/minio.license:/minio.license:ro
+
 volumes:
   siga_pg_data:
+  siga_minio_data:
