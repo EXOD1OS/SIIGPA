@@ -14,6 +14,17 @@ Ord. HCS 448/2011.
 
 ## Puesta en marcha
 
+**Opción recomendada: Docker completo.** La guía de [instalación y actualización con Docker](docs/DOCKER.md)
+levanta SIGA y PostgreSQL, y permite habilitar MinIO AIStor con licencia externa. No requiere Node instalado
+en la PC. Conserva los volúmenes y aplica las migraciones al iniciar. La carga de demostración solo se
+ejecuta sobre una base completamente vacía cuando `DEMO_SEED_IF_EMPTY=true`.
+En Windows, luego de preparar la configuración privada, se puede iniciar con `INICIAR_DEMO.cmd`; acepta una
+ruta alternativa al archivo de configuración y `--minio` cuando AIStor ya tiene licencia configurada.
+
+Los pasos siguientes son la alternativa de desarrollo con Node 20 o posterior en la PC y solo PostgreSQL
+en Docker. No habilitan el perfil `minio`; para almacenar PDF, configurar un servicio S3 por separado o
+seguir la guía completa.
+
 1. Copiar variables de entorno:
 
    ```powershell
@@ -23,7 +34,7 @@ Ord. HCS 448/2011.
 2. Levantar PostgreSQL (requiere Docker Engine en ejecución; Docker Desktop es opcional si usas el Engine de WSL):
 
    ```powershell
-   docker compose up -d
+   docker compose up -d db
    ```
 
 3. Instalar dependencias, generar el cliente Prisma, migrar y sembrar datos de prueba:
@@ -131,8 +142,8 @@ Las copias antiguas y sus observaciones se conservan como antecedentes de solo l
 iguales se unifican; las distintas quedan bloqueadas hasta que Administración compare y elija una
 fuente en la bandeja «PAAD». El conversor puede repetirse sin duplicar documentos ni observaciones.
 Las aprobaciones antiguas de materias no se interpretan como aprobaciones personales.
-**No ejecutar el seed ni db:reset para actualizar una base existente:** el seed es para demostraciones
-y elimina los datos antes de cargar ejemplos. Una instalación vacía puede ejecutar el seed, que ya
+**No ejecutar db:reset para actualizar una base existente:** elimina los datos. El seed ahora rechaza
+una base que ya tenga registros para conservarlos. Una instalación vacía puede ejecutar el seed, que ya
 incluye la conversión y la habilitación de PAAD anuales.
 
 ## Comprobaciones de la separación PAAC/PAAD

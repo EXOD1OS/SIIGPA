@@ -1,0 +1,5 @@
+# Conservar LF en los scripts que se ejecutan en contenedores Linux.
+Dockerfile text eol=lf
+docker/*.sh text eol=lf
+docker/*.mjs text eol=lf
+docker/*.ts text eol=lf

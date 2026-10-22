@@ -1,10 +1,17 @@
 node_modules
 .next
 .next-qa-build
+.next-theme-build
 .next-stale-*
 out
 build
 .env
 .env*.local
+.env.docker
+.env.docker.*
+!.env.docker.example
+config/minio/*
+!config/minio/*.example
+*.license
 *.log
 .DS_Store

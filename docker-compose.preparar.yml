@@ -1,0 +1,7 @@
+services:
+  preparar:
+    image: node:22-bookworm-slim
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    command: ['node', 'docker/preparar-config.mjs']

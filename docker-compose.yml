@@ -1,3 +1,4 @@
+# Requiere Docker Compose 2.24 o posterior. Ver docs/DOCKER.md.
 services:
   db:
     image: postgres:16-alpine
@@ -7,22 +8,91 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: siga_planificaciones
     ports:
-      - '5433:5432'
+      - '127.0.0.1:${DB_PORT:-5433}:5432'
     volumes:
       - siga_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d siga_planificaciones']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    # Permite `docker compose up` después de ejecutar la preparación una vez.
+    # APP_CONFIG_FILE se usa solo cuando el iniciador selecciona otro archivo privado.
+    env_file:
+      - path: ${APP_CONFIG_FILE:-./.env.docker}
+        required: false
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/siga_planificaciones?schema=public
+      - S3_ENDPOINT=http://minio:9000
+      - S3_FORCE_PATH_STYLE=true
+    ports:
+      - '127.0.0.1:${APP_PORT:-3000}:3000'
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 180s
+      retries: 10
 
   minio:
-    image: quay.io/minio/aistor/minio:latest
+    profiles: ['minio']
+    # Índice oficial multi-arquitectura. Sobrescribir MINIO_IMAGE para conservar otra versión instalada.
+    image: ${MINIO_IMAGE:-quay.io/minio/aistor/minio@sha256:107cf2014a9583c74c11e3cdbd6903d89c2244355886b89ce532f4ecae9c23f3}
     restart: unless-stopped
     env_file:
-      - ../../../minio/root.env
+      - path: ${MINIO_ROOT_ENV_FILE:-./config/minio/root.env}
+        required: false
     command: minio server /data --license /minio.license --console-address ":9001"
     ports:
-      - '9000:9000'
-      - '9001:9001'
+      - '127.0.0.1:${MINIO_API_PORT:-9000}:9000'
+      - '127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001'
     volumes:
       - siga_minio_data:/data
-      - ../../../minio/minio.license:/minio.license:ro
+      - type: bind
+        source: ${MINIO_LICENSE_FILE:-./config/minio/minio.license}
+        target: /minio.license
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ['CMD', 'curl', '--fail', '--silent', '--max-time', '4', 'http://127.0.0.1:9000/minio/health/ready']
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+
+  minio-init:
+    profiles: ['minio']
+    image: ${MINIO_IMAGE:-quay.io/minio/aistor/minio@sha256:107cf2014a9583c74c11e3cdbd6903d89c2244355886b89ce532f4ecae9c23f3}
+    restart: 'no'
+    entrypoint: ['/bin/sh', '/opt/siga/minio-init.sh']
+    env_file:
+      - path: ${APP_CONFIG_FILE:-./.env.docker}
+        required: false
+      - path: ${MINIO_ROOT_ENV_FILE:-./config/minio/root.env}
+        required: false
+    environment:
+      - MINIO_ENDPOINT=http://minio:9000
+    volumes:
+      - type: bind
+        source: ./docker/minio-init.sh
+        target: /opt/siga/minio-init.sh
+        read_only: true
+        bind:
+          create_host_path: false
+    depends_on:
+      minio:
+        condition: service_healthy
 
 volumes:
   siga_pg_data:

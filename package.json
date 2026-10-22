@@ -14,6 +14,7 @@
     "prisma:paad:migrar": "tsx prisma/migrar-paad.ts",
     "test:paad": "tsx --test tests/paad.test.ts",
     "test:expediente-pdf": "tsx --test tests/expediente-pdf.test.ts",
+    "test:preparacion": "tsx --test tests/database-state.test.ts && node --test tests/docker-config.test.mjs",
     "test:paad:integracion": "tsx tests/paad-integracion.ts",
     "db:reset": "prisma migrate reset --force"
   },

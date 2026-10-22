@@ -1,3 +1,4 @@
+import { loadEnvConfig } from '@next/env';
 import { PrismaClient, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import type {
@@ -10,13 +11,13 @@ import { ISI_CATEDRAS } from './isi-catedras';
 import { generarPlanificacionesDelCiclo } from '../src/lib/generar-planificaciones';
 import { migrarPaads } from '../src/lib/migrar-paad';
 import { asegurarPaad } from '../src/lib/paad';
+import { assertDomainDatabaseEmpty } from '../src/lib/database-state';
 
+loadEnvConfig(process.cwd());
 const prisma = new PrismaClient();
 
 async function main() {
-  await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE "ObservacionPaad", "DictamenPaad", "PresentacionPaad", "PaadAnual", "IntegrantePlanificacion", "AsignacionCatedra", "ItemObservacion", "PaadDocente", "Planificacion", "Asignatura", "PlanEstudio", "Usuario", "Carrera", "Departamento", "Sede" CASCADE;`
-  );
+  await assertDomainDatabaseEmpty(prisma);
 
   const passwordHash = await bcrypt.hash('unlar2026', 10);
   const sede = await prisma.sede.create({ data: { nombre: 'Sede Capital - La Rioja', esCapital: true } });
