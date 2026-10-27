@@ -170,7 +170,6 @@ function prepararArchivos(planif: {
 numeroExpediente: string, numeroResolucion: string, fechaAprobacion: Date): ArchivoParaGenerar[] {
 const tipos = tiposPdfExpediente();
 exigirDictamenesAprobados(planif, tipos);
-const carrera = planif.asignatura.planEstudio.carrera;
 const archivos: ArchivoParaGenerar[] = [];
 
   if (tipos.includes('PAAC')) {
@@ -208,26 +207,7 @@ const archivos: ArchivoParaGenerar[] = [];
     archivos.push({ tipo: 'INFORME_GENERAL', nombreArchivo: 'informe-general.pdf', datos: planif.informeGeneral });
   }
 
-  return archivos.map((archivo) => ({
-    ...archivo,
-    datos: {
-      ...(archivo.datos && typeof archivo.datos === 'object' && !Array.isArray(archivo.datos)
-        ? archivo.datos as Record<string, unknown>
-        : { contenido: archivo.datos }),
-      encabezado: {
-        institucion: 'Universidad Nacional de La Rioja — DACEFyN',
-        carrera: carrera.nombre,
-        sede: carrera.sede.nombre,
-        planEstudio: planif.asignatura.planEstudio.ordenanza,
-        asignatura: planif.asignatura.nombre,
-        cicloLectivo: planif.cicloLectivo,
-        docenteResponsable: `${planif.docenteResponsable.nombre} ${planif.docenteResponsable.apellido}`,
-        expediente: numeroExpediente,
-        resolucion: numeroResolucion,
-        fechaAprobacion: fechaAprobacion.toLocaleDateString('es-AR'),
-      },
-    },
-  }));
+  return archivos;
 }
 
 export async function archivarExpedienteFinal(
@@ -269,6 +249,7 @@ export async function archivarExpedienteFinal(
   for (const archivo of archivos) {
     const objectKey = `planificaciones/${planificacionId}/${archivo.tipo.toLowerCase()}${archivo.docenteId ? `/${archivo.docenteId}` : ''}.pdf`;
     const pdf = await generarPdfExpediente({
+      tipo: archivo.tipo,
       titulo: TITULOS[archivo.tipo],
       contexto: {
         asignatura: planif.asignatura.nombre,

@@ -44,6 +44,15 @@ AIStor requiere una **licencia válida propia**. El repositorio no incluye ni ge
 Consultar la [instalación oficial de AIStor](https://docs.min.io/aistor/installation/container/install/).
 Sin ese perfil se puede usar el circuito académico; el archivado final de PDF requiere el almacenamiento.
 
+Si MinIO ya se ejecuta en otro proyecto Docker, configurar `S3_ENDPOINT` en `.env.docker`
+con una dirección **alcanzable desde el contenedor de SIGA**. El valor predeterminado
+`http://minio:9000` funciona cuando MinIO está en la misma red Compose; `localhost`
+dentro del contenedor apunta a SIGA, no al equipo anfitrión. Conservar las credenciales
+S3 existentes en el archivo privado. El perfil `minio` es solo para iniciar un servidor
+desde este proyecto. Para usar un endpoint personalizado, iniciar con
+`docker compose --env-file .env.docker up -d --build` o con `INICIAR_DEMO.cmd`;
+Compose lee el valor de ese archivo al configurar el servicio.
+
 1. Colocar la licencia en `config/minio/minio.license` o definir `MINIO_LICENSE_FILE` en `.env.docker`
    con la ruta del archivo real. La ruta puede ser relativa al repositorio o absoluta; en Windows se
    recomienda escribirla con `/`. No usar una carpeta en lugar del archivo.
@@ -77,6 +86,33 @@ configurar publicación, URL pública y HTTPS; esta guía prepara una instalaci�
 Las credenciales PostgreSQL `postgres/postgres` se conservan por compatibilidad con la base demo anterior;
 no publicar ese puerto en una red externa.
 
+## Prueba del circuito completo en una instalación nueva
+
+Cada integrante debe clonar el repositorio en su propia carpeta. Git incluye código, migraciones
+y datos de demostración; los volúmenes de PostgreSQL, los objetos de MinIO, las claves y la
+licencia de AIStor son locales y no se comparten mediante `git pull`.
+
+1. Ejecutar la preparación de la sección «Instalación nueva». Para probar también el archivado,
+   aportar una licencia válida de AIStor y arrancar con los dos archivos Compose y `--profile minio`
+   como se indica arriba. Dejar `DEMO_SEED_IF_EMPTY=true` en una base nueva.
+2. Comprobar los servicios con el comando `ps -a` anterior y abrir
+   `http://localhost:3000/api/health`. La respuesta debe indicar `{"estado":"ok"}`;
+   `app` debe estar `healthy` y `minio-init` debe terminar con `Exited (0)`.
+3. Abrir la aplicación y recorrer una planificación de demostración del ciclo 2026.
+   Las cuentas y la contraseña de demostración están en el README:
+   `titular.prog@unlar.edu.ar` presenta el PAAC; los docentes presentan sus PAAD
+   personales desde «Mi PAAD»; `uap@unlar.edu.ar` emite el Informe Pedagógico;
+   `direccion.isi@unlar.edu.ar` emite el Informe Disciplinar y eleva;
+   `consejo.exactas@unlar.edu.ar` asigna expediente y resolución.
+4. Confirmar que la planificación pasa a `FINALIZADO` y descargar el PAAC y los tres
+   informes desde el expediente. Deben mostrar el escudo de la UNLaR, secciones y
+   pie de página. Los PAAD aprobados también se archivan; los pendientes no impiden
+   finalizar. El detalle de estados y responsabilidades está en el README.
+
+Para probar solo el circuito académico sin AIStor, iniciar con `docker compose up -d --build`.
+La formalización final requiere almacenamiento S3 configurado. En una instalación existente,
+seguir la sección siguiente para actualizar sin borrar volúmenes ni archivos archivados.
+
 ## Actualizar conservando datos y configuración
 
 Conservar el mismo directorio de proyecto y nombre de proyecto Compose. Los volúmenes históricos siguen
@@ -102,7 +138,9 @@ Para detener sin eliminar datos: `docker compose --env-file .env.docker --profil
 
 Si antes se usaban `../../../minio/root.env` y `../../../minio/minio.license`, indicar esas rutas en
 `MINIO_ROOT_ENV_FILE` y `MINIO_LICENSE_FILE` del archivo privado. No es necesario mover ni publicar esos archivos.
-La aplicación dentro de Docker usa `db:5432` y `minio:9000`; `localhost` dentro de un contenedor no es otro servicio.
+La aplicación dentro de Docker usa `db:5432` y el `S3_ENDPOINT` indicado en `.env.docker`
+(o `http://minio:9000` si no se indicó otro);
+`localhost` dentro de un contenedor no es otro servicio.
 El desarrollo fuera de Docker sigue usando los puertos de la PC (`localhost:5433`, `localhost:9000`).
 
 ## Comprobaciones y problemas de arranque

@@ -391,23 +391,34 @@ export async function formalizarResolucion(planifId: string, nroResolucion: stri
   if (planif.numeroResolucion) throw new Error('Ya hay una resolución asignada.');
 
   const fechaAprobacion = new Date();
-  const updated = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM "Planificacion" WHERE id = ${planifId} FOR UPDATE`;
-    const actual = await tx.planificacion.findUniqueOrThrow({ where: { id: planifId } });
-    if (actual.estado !== 'ELEVADO_AL_CONSEJO') throw new Error('La planificación ya no está elevada al consejo.');
-    if (!actual.numeroExpediente) throw new Error('Primero hay que asignar el número de expediente.');
-    if (actual.numeroResolucion) throw new Error('Ya hay una resolución asignada.');
+  let updated;
+  try {
+    updated = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Planificacion" WHERE id = ${planifId} FOR UPDATE`;
+      const actual = await tx.planificacion.findUniqueOrThrow({ where: { id: planifId } });
+      if (actual.estado !== 'ELEVADO_AL_CONSEJO') throw new Error('La planificación ya no está elevada al consejo.');
+      if (!actual.numeroExpediente) throw new Error('Primero hay que asignar el número de expediente.');
+      if (actual.numeroResolucion) throw new Error('Ya hay una resolución asignada.');
 
-    await archivarExpedienteFinal(tx, planifId, actual.numeroExpediente, nroResolucion.trim(), fechaAprobacion);
-    return tx.planificacion.update({
-      where: { id: planifId },
-      data: {
-        numeroResolucion: nroResolucion.trim(),
-        fechaAprobacionCd: fechaAprobacion,
-        estado: 'FINALIZADO',
-      },
-    });
-  }, { maxWait: 10_000, timeout: 120_000 });
+      await archivarExpedienteFinal(tx, planifId, actual.numeroExpediente, nroResolucion.trim(), fechaAprobacion);
+      return tx.planificacion.update({
+        where: { id: planifId },
+        data: {
+          numeroResolucion: nroResolucion.trim(),
+          fechaAprobacionCd: fechaAprobacion,
+          estado: 'FINALIZADO',
+        },
+      });
+    }, { maxWait: 10_000, timeout: 120_000 });
+  } catch (error) {
+    const statusCode = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+    if (statusCode === 403) {
+      return {
+        error: 'El almacenamiento de expedientes rechazo la escritura (S3 403). Revisa que las credenciales de la aplicacion tengan permiso s3:PutObject sobre el bucket y la ruta planificaciones/*.',
+      };
+    }
+    throw error;
+  }
 
   revalidatePlanif(planifId);
   return updated;

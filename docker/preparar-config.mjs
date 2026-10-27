@@ -19,7 +19,7 @@ try {
     'APP_PORT=3000', 'DB_PORT=5433', 'MINIO_API_PORT=9000', 'MINIO_CONSOLE_PORT=9001',
     'NEXTAUTH_URL=http://localhost:3000',
     `NEXTAUTH_SECRET=${randomBytes(32).toString('hex')}`,
-    'DEMO_SEED_IF_EMPTY=true', 'S3_REGION=us-east-1', 'S3_BUCKET=planificaciones-pdf',
+    'DEMO_SEED_IF_EMPTY=true', 'S3_ENDPOINT=http://minio:9000', 'S3_REGION=us-east-1', 'S3_BUCKET=planificaciones-pdf',
     `S3_ACCESS_KEY_ID=siga${randomBytes(8).toString('hex')}`,
     `S3_SECRET_ACCESS_KEY=${randomBytes(24).toString('hex')}`,
     'MINIO_ROOT_ENV_FILE=./config/minio/root.env',

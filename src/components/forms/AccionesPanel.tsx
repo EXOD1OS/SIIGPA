@@ -64,7 +64,11 @@ export function AccionesPanel({
     setError(null);
     startTransition(async () => {
       try {
-        await fn();
+        const result = await fn();
+        if (result && typeof result === 'object' && 'error' in result && typeof result.error === 'string') {
+          setError(result.error);
+          return;
+        }
         router.refresh();
       } catch (e: any) {
         setError(e.message ?? 'Ocurrió un error.');
