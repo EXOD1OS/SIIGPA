@@ -54,21 +54,22 @@ seguir la guía completa.
 
 5. Abrir http://localhost:3000 — todos los usuarios de prueba usan la contraseña `unlar2026`:
 
-   | Email                        | Rol                        |
-   | ---------------------------- | -------------------------- |
-   | admin@unlar.edu.ar           | Administrador              |
-   | direccion.isi@unlar.edu.ar   | Dirección de Carrera (ISI) |
-   | uap@unlar.edu.ar             | UAP                        |
-   | consejo.exactas@unlar.edu.ar | Consejo Departamental      |
-   | titular.prog@unlar.edu.ar    | Docente Responsable        |
-   | auxiliar.prog@unlar.edu.ar   | Docente Auxiliar           |
+   | Email                                | Rol                                                    |
+   | ------------------------------------ | ------------------------------------------------------ |
+   | admin@unlar.edu.ar                   | Administrador                                          |
+   | uap@unlar.edu.ar                     | UAP                                                    |
+   | direccion.isi@unlar.edu.ar           | Dirección de Carrera (ISI)                             |
+   | direccion.lsi@unlar.edu.ar           | Dirección de Carrera (LSI)                             |
+   | direccion.tui@unlar.edu.ar           | Dirección de Carrera (TUI)                             |
+   | consejo.exactas@unlar.edu.ar         | Consejo Departamental                                  |
+   | titular.prog@unlar.edu.ar            | Docente (Lucía Torres, responsable de Programación I)  |
+   | auxiliar.prog@unlar.edu.ar           | Docente (Martín López, debe cambiar la contraseña)     |
+   | sofia.romero@unlar.edu.ar, diego.castro@unlar.edu.ar, mariana.lastra@unlar.edu.ar, eduardo.campazzo@unlar.edu.ar, alejandra.guzman@unlar.edu.ar | Docentes |
 
-   El seed también carga el relevamiento de cátedras de ISI: 59 materias, docentes, asignaciones y
-   planificaciones en borrador para el ciclo 2026. Las cuentas importadas usan el formato
-   `nombre.apellido@unlar.edu.ar`, la contraseña
-   inicial `unlar2026` y deben cambiarla al ingresar. El relevamiento no informa año, régimen, carga horaria
-   ni responsable, por lo que esos campos quedan como `A DEFINIR` y los PAAC se crean como borradores
-   vacíos. El primer integrante queda como responsable provisional hasta que Administración lo confirme.
+   El seed **reinicia la base** y carga exactamente los datos ficticios de `src/prototipo/data/mockData.ts`
+   (copia de `_prototipo/src/data/mockData.ts`): carreras ISI, LSI y TUI de Sede Capital y un PAAC por cada
+   estado del circuito (borrador, en revisión, observado, aprobado pedagógico/disciplinar/pleno, elevado al
+   Consejo y finalizado), además de PAAD en borrador, en revisión, observado y aprobado.
 
    Para otros ciclos, Administración puede iniciar el ciclo desde Gestión Académica. La acción copia
    automáticamente los equipos del ciclo anterior y crea los borradores faltantes; no modifica el historial
@@ -142,9 +143,9 @@ Las copias antiguas y sus observaciones se conservan como antecedentes de solo l
 iguales se unifican; las distintas quedan bloqueadas hasta que Administración compare y elija una
 fuente en la bandeja «PAAD». El conversor puede repetirse sin duplicar documentos ni observaciones.
 Las aprobaciones antiguas de materias no se interpretan como aprobaciones personales.
-**No ejecutar db:reset para actualizar una base existente:** elimina los datos. El seed ahora rechaza
-una base que ya tenga registros para conservarlos. Una instalación vacía puede ejecutar el seed, que ya
-incluye la conversión y la habilitación de PAAD anuales.
+**No ejecutar db:reset ni el seed para actualizar una base existente:** ambos eliminan los datos. El seed
+borra todo el dominio antes de cargar la demostración; con `NODE_ENV=production` rechaza una base con
+registros salvo que se indique `SEED_RESET=true`. Docker solo lo ejecuta sobre una base vacía.
 
 ## Comprobaciones de la separación PAAC/PAAD
 

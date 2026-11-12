@@ -45,11 +45,10 @@ type FiltroRegimen = 'ALL' | Regimen;
 
 const DEFAULT_EXPANDED: Record<string, boolean> = {
   'sede-cap': true,
-  'sede-cham': true,
   'depto-exactas': true,
   'car-isi': true,
   'car-tui': true,
-  'plan-isi-448': true,
+  'plan-isi-231': true,
   'plan-tui-171': true,
 };
 

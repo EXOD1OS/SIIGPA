@@ -33,7 +33,7 @@ Revisar el error antes de continuar.
 
 Las cuentas de demostración se detallan en el README; por ejemplo, `admin@unlar.edu.ar`,
 `uap@unlar.edu.ar` y `titular.prog@unlar.edu.ar`, contraseña `unlar2026`.
-Las materias, docentes y asignaciones de ISI están en el seed del repositorio: no requieren el Excel original.
+La demostración carga los datos ficticios de `src/prototipo/data/mockData.ts` (carreras ISI, LSI y TUI de Sede Capital).
 El ciclo de los ejemplos es 2026; para otros años usar el filtro o iniciar un ciclo desde Administración.
 `DEMO_SEED_IF_EMPTY=false` permite omitir la demostración, pero no crea una cuenta administrativa por sí solo.
 
@@ -160,7 +160,7 @@ puede consultar PostgreSQL. `app` debe aparecer como `healthy`; `minio-init` com
   archivo vacío ni agregar una licencia ajena al repositorio.
 - **No se puede conectar a Docker:** iniciar Docker Engine/Desktop y seleccionar contenedores Linux.
 - **Puerto ocupado:** ajustar los puertos del archivo privado y `NEXTAUTH_URL` si cambia el de la web.
-- **El seed rechaza la base:** ya tiene datos; se protege su contenido. Actualizar con migraciones, no resetearla.
+- **El seed rechaza la base:** en producción no reinicia una base con datos (salvo `SEED_RESET=true`, que la borra). Actualizar con migraciones, no resetearla.
 - **Falló la conversión de PAAD:** conservar la base y revisar sus antecedentes y el error. No forzar su reemplazo.
 - **MinIO no inicia en una base antigua:** conservar la imagen y credenciales de esa instalación; no intentar
   un downgrade ni montar el volumen AIStor con otra edición de MinIO.

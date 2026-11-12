@@ -12,7 +12,7 @@ export interface DocProtocolo {
   id: string;
   estado: string;
   asignatura: string;
-  /** "ISI · Ord. 448/2011 · Ciclo 2026 · Responsable". */
+  /** "ISI · Ord. 231/2023 · Ciclo 2026 · Responsable". */
   detalle: string;
   expediente: string | null;
   /** Fecha de elevación ya formateada. */

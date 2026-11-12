@@ -15,7 +15,7 @@ interface Borrador {
 
 interface Props {
   asignatura: AsignaturaAdmin;
-  /** "Sede · ISI · Ord. 448/2011 (TRADICIONAL)". */
+  /** "Sede · LSI · Ord. 171/2019 (TRADICIONAL)". */
   contexto: string[];
   /** Nombre del departamento de radicación cuando difiere del de la carrera (matricial). */
   radicacionMatricial: string | null;

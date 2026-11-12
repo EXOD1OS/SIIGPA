@@ -31,7 +31,7 @@ export const ROLES: Record<string, string> = {
 export const PEDITEMS = [
   '1. Fundamentación e introducción al perfil profesional',
   '2. Diagnóstico y articulación horizontal/vertical',
-  '3. Coherencia de Objetivos / Matriz de Competencias (Ord. 448/11)',
+  '3. Coherencia de Objetivos / Matriz de Competencias',
   '4. Metodología de enseñanza y recursos didácticos',
   '5. Selección y secuenciación de Unidades de Contenido',
   '6. Programa de Trabajos Prácticos y Laboratorio',
@@ -119,7 +119,6 @@ export function reemplazarCatedrasDeUsuario(
 export function createInitialData() {
   const sedes: Sede[] = [
     { id: 'sede-cap', nombre: 'Sede Capital', esCapital: true },
-    { id: 'sede-cham', nombre: 'Sede Regional Chamical', esCapital: false },
   ];
   const departamentos: Departamento[] = [
     { id: 'depto-exactas', nombre: 'DACEFyN (Ciencias Exactas, Físicas y Naturales)', sedeId: 'sede-cap' },
@@ -130,25 +129,22 @@ export function createInitialData() {
     { id: 'car-isi', codigo: 'ISI', sigla: 'ISI', nombre: 'Ingeniería en Sistemas de Información', sedeId: 'sede-cap', departamentoId: 'depto-exactas', directorId: 'u-dir-isi' },
     { id: 'car-lsi', codigo: 'LSI', sigla: 'LSI', nombre: 'Licenciatura en Sistemas de Información', sedeId: 'sede-cap', departamentoId: 'depto-exactas', directorId: 'u-dir-lsi' },
     { id: 'car-tui', codigo: 'TUI', sigla: 'TUI', nombre: 'Tecnicatura Universitaria en Informática', sedeId: 'sede-cap', departamentoId: 'depto-exactas', directorId: 'u-dir-tui' },
-    { id: 'car-tui-cham', codigo: 'TUI-CHAM', sigla: 'TUI-CH', nombre: 'Tecnicatura Universitaria en Informática (Chamical)', sedeId: 'sede-cham', departamentoId: null, directorId: 'u-dir-tui' },
   ];
+  // Solo planes vigentes (sin la Ord. 448/2011 derogada).
   const planes: PlanEstudio[] = [
-    { id: 'plan-isi-448', carreraId: 'car-isi', ordenanza: 'Ord. HCS N° 448/2011', enfoque: 'COMPETENCIAS', activo: true },
     { id: 'plan-isi-231', carreraId: 'car-isi', ordenanza: 'Ordenanza N° 231/2023', enfoque: 'COMPETENCIAS', activo: true },
     { id: 'plan-lsi-171', carreraId: 'car-lsi', ordenanza: 'Ord. HCS N° 171/2019', enfoque: 'TRADICIONAL', activo: true },
     { id: 'plan-tui-171', carreraId: 'car-tui', ordenanza: 'Ord. HCS N° 171/2019', enfoque: 'TRADICIONAL', activo: true },
-    { id: 'plan-cham-171', carreraId: 'car-tui-cham', ordenanza: 'Ord. HCS N° 171/2019', enfoque: 'TRADICIONAL', activo: true },
   ];
   const asignaturas: Asignatura[] = [
     { id: 'asig-am', codigo: 'ISI-1.03', planEstudioId: 'plan-isi-231', departamentoRadicacionId: 'depto-exactas', nombre: 'Análisis Matemático', anoCursada: 1, regimenDictado: '1C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Números reales. Funciones de una variable. Límite y continuidad. Derivada y aplicaciones. Integral indefinida y definida. Aplicaciones del cálculo integral.' },
     { id: 'asig-aed1', codigo: 'ISI-1.02', planEstudioId: 'plan-isi-231', departamentoRadicacionId: 'depto-exactas', nombre: 'Algoritmo y Estructura de Datos I', anoCursada: 1, regimenDictado: '1C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Resolución de problemas y algoritmos. Tipos de datos simples, expresiones y estructuras de control. Modularización: funciones y procedimientos. Recursividad. Estructuras de datos estáticas: arreglos, cadenas y registros. Algoritmos de búsqueda y ordenamiento. Nociones de complejidad algorítmica.' },
-    { id: 'asig-prog1', codigo: 'ISI-1.01', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Programación I', anoCursada: 1, regimenDictado: '1C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Algoritmos, estructuras de control secuenciales, condicionales y repetitivas. Modularización, funciones y tipos de datos estructurados.' },
-    { id: 'asig-prog2', codigo: 'ISI-1.06', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Programación II', anoCursada: 1, regimenDictado: '2C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Programación orientada a objetos: clases, herencia, polimorfismo. Manejo de excepciones y archivos. Pruebas unitarias.' },
-    { id: 'asig-sis1', codigo: 'ISI-2.04', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-exactas', nombre: 'Sistemas de Información I', anoCursada: 2, regimenDictado: 'ANUAL', horasSemanales: 4, horasTotales: 120, contenidosMinimos: 'Teoría General de Sistemas. Las organizaciones como sistemas. Ingeniería de requerimientos, relevamiento y modelado conceptual.' },
-    { id: 'asig-der', codigo: 'ISI-5.12', planEstudioId: 'plan-isi-448', departamentoRadicacionId: 'depto-sociales', nombre: 'Derecho Informático y Ética Profesional', anoCursada: 5, regimenDictado: '2C', horasSemanales: 4, horasTotales: 60, contenidosMinimos: 'Legislación informática, propiedad intelectual del software, delitos informáticos, protección de datos personales y deontología profesional.' },
+    { id: 'asig-prog1', codigo: 'ISI-1.01', planEstudioId: 'plan-isi-231', departamentoRadicacionId: 'depto-exactas', nombre: 'Programación I', anoCursada: 1, regimenDictado: '1C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Algoritmos, estructuras de control secuenciales, condicionales y repetitivas. Modularización, funciones y tipos de datos estructurados.' },
+    { id: 'asig-prog2', codigo: 'ISI-1.06', planEstudioId: 'plan-isi-231', departamentoRadicacionId: 'depto-exactas', nombre: 'Programación II', anoCursada: 1, regimenDictado: '2C', horasSemanales: 6, horasTotales: 90, contenidosMinimos: 'Programación orientada a objetos: clases, herencia, polimorfismo. Manejo de excepciones y archivos. Pruebas unitarias.' },
+    { id: 'asig-sis1', codigo: 'ISI-2.04', planEstudioId: 'plan-isi-231', departamentoRadicacionId: 'depto-exactas', nombre: 'Sistemas de Información I', anoCursada: 2, regimenDictado: 'ANUAL', horasSemanales: 4, horasTotales: 120, contenidosMinimos: 'Teoría General de Sistemas. Las organizaciones como sistemas. Ingeniería de requerimientos, relevamiento y modelado conceptual.' },
+    { id: 'asig-der', codigo: 'ISI-5.12', planEstudioId: 'plan-isi-231', departamentoRadicacionId: 'depto-sociales', nombre: 'Derecho Informático y Ética Profesional', anoCursada: 5, regimenDictado: '2C', horasSemanales: 4, horasTotales: 60, contenidosMinimos: 'Legislación informática, propiedad intelectual del software, delitos informáticos, protección de datos personales y deontología profesional.' },
     { id: 'asig-bd', codigo: 'TUI-2.03', planEstudioId: 'plan-tui-171', departamentoRadicacionId: 'depto-exactas', nombre: 'Bases de Datos', anoCursada: 2, regimenDictado: '2C', horasSemanales: 4, horasTotales: 60, contenidosMinimos: 'Modelo Entidad-Relación, Modelo Relacional, Álgebra Relacional, Lenguaje SQL (DDL/DML) y Normalización (1FN a FNBC).' },
     { id: 'asig-aed', codigo: 'LSI-1.02', planEstudioId: 'plan-lsi-171', departamentoRadicacionId: 'depto-exactas', nombre: 'Algoritmos y Estructuras de Datos', anoCursada: 1, regimenDictado: 'ANUAL', horasSemanales: 6, horasTotales: 180, contenidosMinimos: 'Tipos abstractos de datos, listas, pilas, colas, árboles y grafos. Recursividad, ordenamiento y búsqueda. Análisis de complejidad.' },
-    { id: 'asig-lab-cham', codigo: 'TUC-1.02', planEstudioId: 'plan-cham-171', departamentoRadicacionId: null, nombre: 'Laboratorio de Software I (Sede Chamical)', anoCursada: 1, regimenDictado: '1C', horasSemanales: 4, horasTotales: 60, contenidosMinimos: 'Herramientas de desarrollo, control de versiones Git, compilación y pruebas básicas de software.' },
   ];
   const usuarios: Usuario[] = [
     { id: 'u-admin', nombre: 'Administrador', apellido: 'General', dni: '20000001', email: 'admin@unlar.edu.ar', rol: 'Administrador', carreraId: null, mustChangePassword: false, activo: true },
@@ -175,7 +171,6 @@ export function createInitialData() {
     { id: 'eq-7', asignaturaId: 'asig-der', docenteId: 'u-sofia', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
     { id: 'eq-8', asignaturaId: 'asig-aed', docenteId: 'u-martin', cicloLectivo: 2026, cargo: 'Profesor Adjunto', esResponsable: true },
     { id: 'eq-9', asignaturaId: 'asig-aed', docenteId: 'u-diego', cicloLectivo: 2026, cargo: 'Jefe de Trabajos Prácticos', esResponsable: false },
-    { id: 'eq-10', asignaturaId: 'asig-lab-cham', docenteId: 'u-lucia', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
     { id: 'eq-aed1-1', asignaturaId: 'asig-aed1', docenteId: 'u-campazzo', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
     { id: 'eq-aed1-2', asignaturaId: 'asig-aed1', docenteId: 'u-guzman', cicloLectivo: 2026, cargo: 'Profesor Adjunto', esResponsable: false },
     { id: 'eq-am-1', asignaturaId: 'asig-am', docenteId: 'u-lastra', cicloLectivo: 2026, cargo: 'Profesor Titular', esResponsable: true },
@@ -469,15 +464,28 @@ export function createInitialData() {
       data: { intro: 'Introduce las estructuras de datos fundamentales y el análisis de algoritmos.' },
       pedReport: pendiente('ped'), discReport: pendiente('disc'),
     }),
-    // TUI Chamical · observada por la Dirección.
+    // ISI · aprobada por la Dirección de Carrera, pendiente del Informe Pedagógico de la UAP.
     paac({
-      id: 'paac-6', asignaturaId: 'asig-lab-cham', owner: 'u-lucia', cycle: 2026, periodo: '1C', state: 'OBSERVADO',
-      data: { intro: 'Primer contacto con herramientas profesionales de desarrollo.', method: 'Laboratorio semanal con entregas cortas.', eval: 'Entregas prácticas y un proyecto final.', units: [['Unidad 1: Git', 'Repositorios, ramas y fusiones.']], tp: [['1', 'Repositorio personal en Git', 'Individual', 'Laboratorio', '4', 'Semana 3']] },
+      id: 'paac-am', asignaturaId: 'asig-am', owner: 'u-lastra', cycle: 2026, periodo: '1C', state: 'APROBADO_DISCIPLINAR', discApproved: true,
+      data: {
+        intro: 'El Análisis Matemático aporta las herramientas del cálculo diferencial e integral necesarias para modelizar y resolver problemas de ingeniería.',
+        diag: 'Ingresantes con nivel dispar en álgebra y trigonometría; se refuerzan funciones y límites en las primeras semanas.',
+        concept: 'Comprender los conceptos de función, límite, continuidad, derivada e integral.',
+        procedure: 'Resolver problemas de aplicación mediante el cálculo diferencial e integral.',
+        attitude: 'Fundamentar los procedimientos y comunicar los resultados con rigor.',
+        method: 'Clases teórico-prácticas, resolución de problemas en grupos y uso de GeoGebra en el aula virtual.',
+        resources: 'Pizarra, proyector, software GeoGebra y guías de trabajos prácticos.',
+        units: [['Unidad 1: Funciones de una variable real', 'Dominio, gráficas, composición e inversa.'], ['Unidad 2: Límite y continuidad', 'Álgebra de límites, límites laterales y continuidad.'], ['Unidad 3: Derivada', 'Reglas de derivación y aplicaciones.'], ['Unidad 4: Integral', 'Integral indefinida, definida y aplicaciones.']],
+        tp: [['1', 'Funciones y gráficas', 'Individual', 'Aula', '6', 'Semana 3'], ['2', 'Límites y continuidad', 'Grupal', 'Aula', '6', 'Semana 6'], ['3', 'Derivadas y aplicaciones', 'Grupal', 'Aula', '8', 'Semana 10']],
+        eval: 'Dos parciales escritos con sus recuperatorios y autoevaluaciones en el aula virtual.',
+        regular: '80 % de asistencia y ambos parciales aprobados con nota >= 4.',
+        promotion: 'Ambos parciales con nota >= 7 sin recuperar y 80 % de TP aprobados.',
+        free: 'Examen escrito de ejercicios y evaluación teórica oral o escrita sobre todo el programa.',
+        books: [['Básica', 'Stewart, J.', 'Cálculo de una variable', 'Cengage Learning', '2018', 'Biblioteca central (6 ej.)'], ['Complementaria', 'Thomas, G. B.', 'Cálculo. Una variable', 'Pearson', '2015', 'Biblioteca central (3 ej.)']],
+        horas: [['3'], ['3'], ['0'], ['1']],
+      },
       pedReport: pendiente('ped'),
-      discReport: { items: { 0: 'Cumple parcialmente: falta la unidad de pruebas.', 1: 'Cumple', 2: 'Bibliografía desactualizada.' }, dictamen: 'OBSERVADO', obsDisciplinares: 'Incorporar los contenidos mínimos de pruebas básicas y actualizar la bibliografía.', by: 'Laura Pérez', fecha: '15/04/2026' },
-      comments: [
-        { id: 'obs-cham-1', field: 'unidades', campoPath: 'paac.unidades', section: 5, area: 'direccion', author: 'Laura Pérez (Dirección TUI)', text: 'Falta una unidad con los contenidos mínimos de pruebas básicas de software.', date: '15/04/2026', resolved: false },
-      ],
+      discReport: informeFavorable('disc', 'María Vega', '22/04/2026', 'Cumple con los contenidos mínimos del plan de estudios.'),
     }),
     // ISI · instanciada por el lote de 2C pero todavía sin iniciar (data vacía).
     paac({
@@ -488,14 +496,14 @@ export function createInitialData() {
     // Ciclo 2025 (históricas)
     paac({
       id: 'paac-h1', asignaturaId: 'asig-prog1', owner: 'u-lucia', cycle: 2025, periodo: '1C', state: 'FINALIZADO', pedApproved: true, discApproved: true,
-      expediente: 'EXP-2025-0412', resolucion: 'RES-CD-031/25',
+      expediente: 'EXP-UNLaR-2025-00412', resolucion: 'RES-CS-2025-0031', fechaElevacion: '05/05/2025', fechaResolucion: '20/06/2025',
       data: { ...docs[0].data },
       pedReport: informeFavorable('ped', 'Ana Suárez', '28/04/2025', 'Propuesta consolidada.'),
       discReport: informeFavorable('disc', 'María Vega', '30/04/2025', 'Cumple con los contenidos mínimos del plan.'),
     }),
     paac({
       id: 'paac-h2', asignaturaId: 'asig-bd', owner: 'u-diego', cycle: 2025, periodo: '2C', state: 'FINALIZADO', pedApproved: true, discApproved: true,
-      expediente: 'EXP-2025-0447', resolucion: 'RES-CD-036/25',
+      expediente: 'EXP-UNLaR-2025-00447', resolucion: 'RES-CS-2025-0036', fechaElevacion: '01/09/2025', fechaResolucion: '15/10/2025',
       data: { ...docs[2].data },
       pedReport: informeFavorable('ped', 'Ana Suárez', '25/08/2025', 'Sin observaciones.'),
       discReport: informeFavorable('disc', 'Laura Pérez', '27/08/2025', 'Cumple.'),
@@ -503,7 +511,7 @@ export function createInitialData() {
     paac({
       id: 'paac-h3', asignaturaId: 'asig-sis1', owner: 'u-sofia', cycle: 2025, periodo: '1C', state: 'ELEVADO_AL_CONSEJO', pedApproved: true, discApproved: true,
       // 1.ª instancia cumplida: expediente caratulado, resolución del Consejo Superior pendiente.
-      expediente: 'EXP-UNLaR-2026-00389', resolucion: '', fechaElevacion: '12/05/2025',
+      expediente: 'EXP-UNLaR-2025-00389', resolucion: '', fechaElevacion: '12/05/2025',
       data: { ...docs[1].data },
       pedReport: informeFavorable('ped', 'Ana Suárez', '05/05/2025', 'Adecuada secuenciación de contenidos.'),
       discReport: informeFavorable('disc', 'María Vega', '08/05/2025', 'Cumple; se sugiere ampliar bibliografía complementaria.'),
