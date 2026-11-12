@@ -16,7 +16,11 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const usuario = await prisma.usuario.findUnique({ where: { email: credentials.email } });
+        // Se acepta el correo institucional o el DNI como identificador.
+        const identificador = credentials.email.trim();
+        const usuario = await prisma.usuario.findFirst({
+          where: { OR: [{ email: { equals: identificador, mode: 'insensitive' } }, { dni: identificador }] },
+        });
         if (!usuario) return null;
 
         const valid = await bcrypt.compare(credentials.password, usuario.passwordHash);
@@ -34,12 +38,20 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         token.id = (user as any).id;
         token.rol = (user as any).rol;
         token.carreraId = (user as any).carreraId;
         token.mustChangePassword = (user as any).mustChangePassword;
+      }
+      // `useSession().update()` tras cambiar la contraseña: se relee el estado real desde la base.
+      if (trigger === 'update' && token.id) {
+        const actual = await prisma.usuario.findUnique({
+          where: { id: token.id as string },
+          select: { mustChangePassword: true },
+        });
+        if (actual) token.mustChangePassword = actual.mustChangePassword;
       }
       return token;
     },

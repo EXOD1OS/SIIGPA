@@ -54,14 +54,14 @@ seguir la guía completa.
 
 5. Abrir http://localhost:3000 — todos los usuarios de prueba usan la contraseña `unlar2026`:
 
-   | Email                         | Rol                     |
-   | ------------------------------ | ------------------------ |
-   | admin@unlar.edu.ar             | Administrador             |
-   | direccion.isi@unlar.edu.ar     | Dirección de Carrera (ISI) |
-   | uap@unlar.edu.ar               | UAP                        |
-   | consejo.exactas@unlar.edu.ar   | Consejo Departamental       |
-   | titular.prog@unlar.edu.ar      | Docente Responsable         |
-   | auxiliar.prog@unlar.edu.ar     | Docente Auxiliar            |
+   | Email                        | Rol                        |
+   | ---------------------------- | -------------------------- |
+   | admin@unlar.edu.ar           | Administrador              |
+   | direccion.isi@unlar.edu.ar   | Dirección de Carrera (ISI) |
+   | uap@unlar.edu.ar             | UAP                        |
+   | consejo.exactas@unlar.edu.ar | Consejo Departamental      |
+   | titular.prog@unlar.edu.ar    | Docente Responsable        |
+   | auxiliar.prog@unlar.edu.ar   | Docente Auxiliar           |
 
    El seed también carga el relevamiento de cátedras de ISI: 59 materias, docentes, asignaciones y
    planificaciones en borrador para el ciclo 2026. Las cuentas importadas usan el formato

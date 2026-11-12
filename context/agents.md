@@ -1,42 +1,41 @@
-# AGENTS.md
+guia.md
+Guía de desarrollo, arquitectura y especificaciones del sistema SIGA-Planificaciones para asistentes de IA y agentes de codificación autónomos (Claude Code, Cursor, Windsurf, Copilot).
 
-Guía de desarrollo, arquitectura y especificaciones del sistema **SIGA-Planificaciones** para asistentes de IA y agentes de codificación autónomos (Claude Code, Cursor, Windsurf, Copilot).
+1. Visión General del Dominio y Sistema
+SIGA-Planificaciones es el Sistema de Gestión de Planificaciones Docentes (PAAC/PAAD) para el Departamento Académico de Ciencias Exactas, Físicas y Naturales (DACEFyN) de la Universidad Nacional de La Rioja (UNLaR). Digitaliza, audita y gestiona el circuito administrativo estipulado por las normativas institucionales:
 
----
+Ordenanza HCS N° 171/2019: Estructura base del PAAC (Anexo II) y PAAD (Anexo III).
+Ordenanza HCS N° 219/2022: Circuitos de evaluación, Informe Pedagógico UAP (Anexo III), Informe Disciplinar de Dirección (Anexo IV), Informe General (Anexo V) y Nota de Elevación (Anexo II).
+Ordenanza HCS N° 448/2011: Plan de transición por competencias para carreras de informática.
+Carreras Contempladas
+TUI: Tecnicatura Universitaria en Informática.
+ISI: Ingeniería en Sistemas de Información.
+LSI: Licenciatura en Sistemas de Información.
+Reglas Críticas del Negocio Académico
+Jerarquía Académica Diferenciada:
+Sede Capital: Jerarquía completa: Sede Capital -> Departamento (DACEFyN) -> Carrera (TUI/ISI/LSI) -> Plan de Estudio -> Asignatura -> Equipo de Cátedra.
+Sedes Regionales: Sin división departamental: Sede Regional -> Carrera -> Plan de Estudio -> Asignatura -> Equipo de Cátedra.
+Estructura Matricial de Asignaturas:
+Ciertas materias pertenecen curricularmente a una carrera pero se radican y dictan desde otro departamento académico (ej. Derecho Informático y Ética Profesional pertenece a ISI pero se radica en el Departamento de Ciencias Humanas). La planificación se deriva al departamento que gestiona la asignatura.
+Planes Tradicionales vs. Competencias:
+Tradicional (Ord. 171/19): Objetivos conceptuales, procedimentales y actitudinales.
+Competencias (Ord. 448/11): Matriz de competencias genéricas y específicas, nivel de aporte (0 a 3) y descriptores de aprendizaje.
+Provisioning de Usuarios y Acceso:
+Sin autorregistro. Los usuarios son creados exclusivamente por el Administrador.
+Identificador y credencial provisoria: DNI.
+La bandera must_change_password = true fuerza el cambio de clave en /cambiar-password en el primer login.
+Generación por Lotes de Planificaciones:
+Los docentes no crean planificaciones manualmente. El Administrador dispara el ciclo lectivo (1C: anuales y primer cuatrimestre; 2C: segundo cuatrimestre), instanciando los registros en estado BORRADOR con sus respectivos PAAC y PAAD para el equipo docente asignado.
+2. Diagrama de Base de Datos (Entity-Relationship)
+Unable to render rich display
 
-## 1. Visión General del Dominio y Sistema
+Parse error on line 215:
+... created_at }## 3. Máquina de Est
+-------------------^
+Expecting 'EOF', 'NEWLINE', 'title', 'acc_title', 'acc_descr', 'acc_descr_multiline_value', 'END', 'SUBGRAPH', 'direction_tb', 'direction_bt', 'direction_rl', 'direction_lr', 'CLASSDEF', 'UNICODE_TEXT', 'CLASS', 'STYLE', 'NUM', 'ENTITY_NAME', 'DECIMAL_NUM', 'ENTITY_ONE', got 'BRKT'
 
-**SIGA-Planificaciones** es el Sistema de Gestión de Planificaciones Docentes (PAAC/PAAD) para el Departamento Académico de Ciencias Exactas, Físicas y Naturales (**DACEFyN**) de la **Universidad Nacional de La Rioja (UNLaR)**. Digitaliza, audita y gestiona el circuito administrativo estipulado por las normativas institucionales:
-* **Ordenanza HCS N° 171/2019**: Estructura base del PAAC (Anexo II) y PAAD (Anexo III).
-* **Ordenanza HCS N° 219/2022**: Circuitos de evaluación, Informe Pedagógico UAP (Anexo III), Informe Disciplinar de Dirección (Anexo IV), Informe General (Anexo V) y Nota de Elevación (Anexo II).
-* **Ordenanza HCS N° 448/2011**: Plan de transición por competencias para carreras de informática.
 
-### Carreras Contempladas
-* **TUI**: Tecnicatura Universitaria en Informática.
-* **ISI**: Ingeniería en Sistemas de Información.
-* **LSI**: Licenciatura en Sistemas de Información.
 
-### Reglas Críticas del Negocio Académico
-1. **Jerarquía Académica Diferenciada**:
-   * **Sede Capital**: Jerarquía completa: `Sede Capital` -> `Departamento` (DACEFyN) -> `Carrera` (TUI/ISI/LSI) -> `Plan de Estudio` -> `Asignatura` -> `Equipo de Cátedra`.
-   * **Sedes Regionales**: Sin división departamental: `Sede Regional` -> `Carrera` -> `Plan de Estudio` -> `Asignatura` -> `Equipo de Cátedra`.
-2. **Estructura Matricial de Asignaturas**:
-   * Ciertas materias pertenecen curricularmente a una carrera pero se radican y dictan desde otro departamento académico (ej. *Derecho Informático y Ética Profesional* pertenece a ISI pero se radica en el Departamento de Ciencias Humanas). La planificación se deriva al departamento que gestiona la asignatura.
-3. **Planes Tradicionales vs. Competencias**:
-   * **Tradicional (Ord. 171/19)**: Objetivos conceptuales, procedimentales y actitudinales.
-   * **Competencias (Ord. 448/11)**: Matriz de competencias genéricas y específicas, nivel de aporte (0 a 3) y descriptores de aprendizaje.
-4. **Provisioning de Usuarios y Acceso**:
-   * **Sin autorregistro**. Los usuarios son creados exclusivamente por el Administrador.
-   * Identificador y credencial provisoria: **DNI**.
-   * La bandera `must_change_password = true` fuerza el cambio de clave en `/cambiar-password` en el primer login.
-5. **Generación por Lotes de Planificaciones**:
-   * Los docentes **no crean** planificaciones manualmente. El Administrador dispara el ciclo lectivo (`1C`: anuales y primer cuatrimestre; `2C`: segundo cuatrimestre), instanciando los registros en estado `BORRADOR` con sus respectivos PAAC y PAAD para el equipo docente asignado.
-
----
-
-## 2. Diagrama de Base de Datos (Entity-Relationship)
-
-```mermaid
 erDiagram
     DEPARTAMENTOS ||--o{ CARRERAS : administra_en_capital
     DEPARTAMENTOS ||--o{ ASIGNATURAS : radica_matricial_capital
@@ -325,26 +324,5 @@ Las observaciones no son notas de texto libre genéricas, sino anotaciones ancla
 * **Base de Datos**: PostgreSQL 16 + Prisma ORM 5.22.
 * **Autenticación**: NextAuth.js v4 con CredentialsProvider (`bcryptjs`).
 * **Estado Global UI**: Redux Toolkit (filtros de carrera/ciclo, documento activo, observaciones).
-* **UI & Estilos**: Tailwind CSS 3 con paleta institucional **Dark Slate**:
-  * Base: `#0c0f17` | Card/Superficie: `#161b26` | Sidebar: `#11151f` | Bordes: `#262e40`.
-  * Primario: `#3b82f6` | Éxito: `#10b981` | Advertencia: `#f59e0b` | Peligro: `#ef4444`.
+* **UI & Estilos**: Tailwind CSS 3 con paleta institucional **Dark 
 
----
-
-## 8. Instrucciones Operativas para el Agente
-
-### Comandos de Entorno
-
-```bash
-# Iniciar contenedor de PostgreSQL
-docker compose up -d
-
-# Migrar y generar cliente Prisma
-npx prisma generate
-npx prisma migrate dev --name init
-
-# Sembrar datos institucionales y usuarios de prueba
-npm run prisma:seed
-
-# Servidor de desarrollo
-npm run dev

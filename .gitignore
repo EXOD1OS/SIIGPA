@@ -1,10 +1,12 @@
+# Dependencias y compilación de Next.js / Node
 node_modules
 .next
 .next-qa-build
 .next-theme-build
 .next-stale-*
-out
 build
+
+# Variables de entorno y configuraciones privadas
 .env
 .env*.local
 .env.docker
@@ -13,5 +15,15 @@ build
 config/minio/*
 !config/minio/*.example
 *.license
+
+# Archivos de registro y caché de compilación
 *.log
+*.tsbuildinfo
+
+# Basura del sistema operativo y exploradores
 .DS_Store
+desktop.ini
+Thumbs.db
+
+# Prototipos y diagramas locales de contexto
+context/_prototipo/

@@ -36,19 +36,18 @@ export default async function PlanificacionesPage({
 
   return (
     <div className="mx-auto w-full max-w-[1440px] space-y-5">
-      <header className="relative overflow-hidden rounded-2xl border border-blue-200/10 bg-gradient-to-r from-[#10213d] via-[#0d1b32] to-[#101a38] p-5 shadow-lg shadow-blue-950/20 sm:flex sm:items-center sm:justify-between sm:gap-6 sm:p-7">
-        <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-28 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="relative">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-300">Gestión académica</p>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-3xl">Planificaciones</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-300">
+      <header className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-6">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Gestión académica</p>
+          <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-white">Planificaciones</h1>
+          <p className="mt-1 max-w-2xl text-sm text-slate-400">
             {session.user.rol === 'ADMINISTRADOR'
               ? 'Consultá, filtrá y revisá las planificaciones de todas las carreras.'
               : 'Consultá tus planificaciones y encontrá rápidamente cada ciclo y estado.'}
           </p>
         </div>
-        <div className="relative mt-4 flex w-fit items-center self-start rounded-xl border border-white/10 bg-[#071326]/35 px-5 py-4 shadow-lg backdrop-blur-sm sm:mt-0 sm:self-auto">
-          <Image src="/unlar-logo.png" alt="Universidad Nacional de La Rioja" width={311} height={104} priority className="h-auto w-52 object-contain sm:w-60" />
+        <div className="flex w-fit items-center rounded-lg border border-border bg-background px-4 py-3">
+          <Image src="/unlar-logo.png" alt="Universidad Nacional de La Rioja" width={311} height={104} priority className="h-auto w-44 object-contain sm:w-52" />
         </div>
       </header>
 
