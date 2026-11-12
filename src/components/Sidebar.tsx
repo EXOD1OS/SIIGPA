@@ -97,8 +97,15 @@ export function Sidebar({ rol }: { rol: string }) {
         <IconCollapse className={`h-3.5 w-3.5 transition-transform duration-300 ${collapsed ? 'rotate-180' : ''}`} />
       </button>
 
-      <nav aria-label="Navegación principal" className="flex gap-1 overflow-x-auto p-3 md:flex-1 md:flex-col md:space-y-1 md:overflow-x-visible md:overflow-y-auto">
-        <div className={`hidden px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted md:block ${fade(collapsed)}`}>{ROL_LABELS[rol] ?? rol}</div>
+      {/* Sin desborde horizontal ni barras residuales. Contraído, el nav queda `overflow-visible` (sin scroll)
+          para que los tooltips puedan salir del menú; expandido, solo desplaza en vertical. */}
+      <nav
+        aria-label="Navegación principal"
+        className={`flex gap-1 overflow-x-auto p-3 [scrollbar-width:none] md:flex-1 md:flex-col md:space-y-1 [&::-webkit-scrollbar]:hidden ${
+          collapsed ? 'md:overflow-visible' : 'md:overflow-y-auto md:overflow-x-hidden'
+        }`}
+      >
+        {!collapsed && <div className={`hidden px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-muted md:block ${fade(collapsed)}`}>{ROL_LABELS[rol] ?? rol}</div>}
         {items.map((item) => {
           const { href, label, Icon } = item;
           const active = esActiva(item);
@@ -108,9 +115,9 @@ export function Sidebar({ rol }: { rol: string }) {
               href={href}
               aria-current={active ? 'page' : undefined}
               aria-label={collapsed ? label : undefined}
-              className={`group relative flex shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary md:w-full ${
-                active ? 'bg-soft font-semibold text-primary' : 'text-muted hover:bg-background hover:text-ink'
-              }`}
+              className={`group relative flex shrink-0 items-center gap-3 rounded-lg px-3 py-2.5 text-xs font-medium transition-colors duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${
+                collapsed ? 'md:mx-auto md:h-10 md:w-10 md:justify-center md:gap-0 md:px-0 md:py-0' : 'md:w-full'
+              } ${active ? 'bg-soft font-semibold text-primary' : 'text-muted hover:bg-background hover:text-ink'}`}
             >
               {/* Indicador de sección activa */}
               <span
@@ -118,7 +125,7 @@ export function Sidebar({ rol }: { rol: string }) {
                 className={`absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary transition-opacity duration-200 ${active ? 'opacity-100' : 'opacity-0'}`}
               />
               <Icon className="h-[18px] w-[18px] shrink-0" />
-              <span className={`text-left ${fade(collapsed)}`}>{label}</span>
+              <span className={`text-left ${fade(collapsed)} ${collapsed ? 'md:hidden' : ''}`}>{label}</span>
 
               {/* Tooltip cuando está contraído */}
               {collapsed && (
@@ -134,12 +141,8 @@ export function Sidebar({ rol }: { rol: string }) {
         })}
       </nav>
 
-      <div className="hidden border-t border-border p-4 text-[11px] text-muted md:block">
-        <div
-          className={`space-y-1.5 overflow-hidden whitespace-nowrap transition-[opacity,max-height] duration-300 ease-in-out ${
-            collapsed ? 'md:max-h-0 md:opacity-0' : 'max-h-40 opacity-100'
-          }`}
-        >
+      <div className={`hidden overflow-hidden border-t border-border text-[11px] text-muted md:block ${collapsed ? 'px-2 py-4' : 'p-4'}`}>
+        <div className={`space-y-1.5 overflow-hidden whitespace-nowrap ${collapsed ? 'hidden' : 'block'}`}>
           <div className="text-[10px] font-bold uppercase tracking-wider text-muted">Normativa vigente</div>
           {NORMATIVA.map((n) => (
             <a
