@@ -11,6 +11,10 @@
 - Login rediseñado (`login/page.tsx`, `login-form.tsx`, `shared/UnlarLogo.tsx`) con fondo de campus, tarjeta glassmorphism y botón de tema, conectado a `signIn('credentials')`; `lib/auth.ts` acepta correo o DNI y relee `mustChangePassword` en `update()`.
 - Cambio de contraseña como modal (`shared/CambiarPasswordModal.tsx`) sobre la nueva Server Action `cambiarPasswordAction` (valida la contraseña actual, mínimo 8 caracteres); se abre desde el menú de perfil y de forma obligatoria si `mustChangePassword`. `/cambiar-password` redirige y se eliminó `CambiarPasswordForm.tsx`.
 - Nuevo `layout/Header.tsx` y `Sidebar.tsx` (contraíble, `next/link` + `usePathname`) integrados en `(app)/layout.tsx`; "Normativa vigente" enlaza solo a Ord. HCS 171/2019 y 219/2022. `_prototipo` excluido de `tsconfig.json`.
+- **Migración UI Etapa 2:** dashboards de Inicio por rol en `src/components/dashboards/` (`DashboardKit`, `Docente/Uap/Direccion/ConsejoDashboardView`, `DashboardInicio`) con donas SVG, KPIs uniformes, matriz PAAC/PAAD por carrera y tarjetas clickeables; datos reales vía `lib/dashboard-datos.ts` y deep-linking `router.push('/planificaciones|/paads?careerId=&state=…')`.
+- `StatusBadge.tsx` y `ESTADO_LABELS` unificados con el prototipo ("En revisión", "Observado" + "Observaciones pendientes", PAAC "Presentado"/"Correcciones"); helpers `dictamenesPaac`, `etapaPaac` y `progresoSecciones` en `types/planificacion.ts`.
+- `PlanificacionesList.tsx` y nuevo `PaadsList.tsx` con `table-fixed` y anchos fijos, filtros iniciales desde `useSearchParams()`; sin "Esperando Resolución" en `ELEVADO_AL_CONSEJO`; la bandeja de PAAD solo ofrece "Ver PAAD".
+- Aprobación simple del PAAD en `lib/paad.ts` (`operarPaad`): un dictamen favorable de UAP o de la Dirección pasa a `APROBADO`; se ajustó `tests/paad-integracion.ts`.
 
 
 ### Migración y Modernización de Interfaces (UI/UX)

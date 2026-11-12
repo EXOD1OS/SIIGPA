@@ -60,7 +60,6 @@ async function main() {
   ok(rev1.autorId === docente.id && rev1.rolAutor === 'DOCENTE');
   await rechaza(operarPaad(db, actor(admin), p.id, 'direccion', { carreraId: ajena.id }), /primera presentación/);
   await rechaza(operarPaad(db, actor(otroDirector), p.id, 'dictaminar', { presentacionId: rev1.id, resultado: 'FAVORABLE' }), /autorizado|revisar/);
-  await operarPaad(db, actor(uap), p.id, 'dictaminar', { presentacionId: rev1.id, resultado: 'FAVORABLE' });
   await operarPaad(db, actor(director), p.id, 'dictaminar', { presentacionId: rev1.id, resultado: 'REQUIERE_CORRECCION', mensaje: 'Corregir gestión' });
   full = await paadVisible(db, actor(docente), p.id);
   ok(full.estado === 'OBSERVADO');
@@ -76,12 +75,14 @@ async function main() {
   ok(rev2.numero === 2 && rev2.dictamenes.length === 0);
   ok((rev1.datosPaad as unknown as typeof data).gestion.detalle === 'Versión inicial');
   await rechaza(operarPaad(db, actor(uap), p.id, 'dictaminar', { presentacionId: rev1.id, resultado: 'FAVORABLE' }), /presentación cambió/);
-  await Promise.all([
+  // Aprobación simple: el primer dictamen favorable (UAP o Dirección) aprueba; el otro queda rechazado.
+  const aprobaciones = await Promise.allSettled([
     operarPaad(db, actor(uap), p.id, 'dictaminar', { presentacionId: rev2.id, resultado: 'FAVORABLE' }),
     operarPaad(db, actor(director), p.id, 'dictaminar', { presentacionId: rev2.id, resultado: 'FAVORABLE' }),
   ]);
+  ok(aprobaciones.filter(r => r.status === 'fulfilled').length === 1);
   full = await paadVisible(db, actor(docente), p.id);
-  ok(full.estado === 'APROBADO' && full.presentaciones[0].dictamenes.length === 2);
+  ok(full.estado === 'APROBADO' && full.presentaciones[0].dictamenes.length === 1);
   await rechaza(operarPaad(db, actor(docente), p.id, 'guardar', { datos: data }), /editable/);
   await rechaza(operarPaad(db, actor(uap), p.id, 'observar', { presentacionId: rev2.id, mensaje: 'Tarde' }), /revisión/);
   await db.integrantePlanificacion.delete({ where: { planificacionId_docenteId: { planificacionId: m2.id, docenteId: docente.id } } });

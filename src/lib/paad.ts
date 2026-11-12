@@ -6,7 +6,7 @@ import type { PaadData } from '@/types/planificacion';
 export type PaadActor = { id: string; rol: UserRole; carreraId: string | null };
 export type PaadTx = Prisma.TransactionClient;
 export const PAAD_LABELS: Record<PaadStatus, string> = {
-  BORRADOR: 'Borrador', ENVIADO_A_REVISION: 'Enviado a revisión', OBSERVADO: 'Observado',
+  BORRADOR: 'Borrador', ENVIADO_A_REVISION: 'En revisión', OBSERVADO: 'Observado',
   APROBADO_UAP: 'Aprobado por UAP', APROBADO_DIRECCION: 'Aprobado por Dirección', APROBADO: 'Aprobado',
 };
 export const PAAD_REVISABLES: PaadStatus[] = ['ENVIADO_A_REVISION', 'APROBADO_UAP', 'APROBADO_DIRECCION'];
@@ -155,8 +155,9 @@ export async function operarPaad(db: PrismaClient, actor: PaadActor, id: string,
     }
     await tx.dictamenPaad.create({ data: { presentacionId: revision.id, autorId: actor.id, rolAutor: actor.rol,
       resultado: 'FAVORABLE', comentario: mensaje } });
-    const ambos = revision.dictamenes.some(d => d.resultado === 'FAVORABLE' && d.rolAutor !== actor.rol);
-    return tx.paadAnual.update({ where: { id }, data: { estado: ambos ? 'APROBADO' : actor.rol === UserRole.UAP ? 'APROBADO_UAP' : 'APROBADO_DIRECCION' } });
+    // Aprobación simple: basta el dictamen favorable de UAP o de la Dirección evaluadora.
+    // (APROBADO_UAP / APROBADO_DIRECCION quedan solo para datos históricos y siguen siendo revisables.)
+    return tx.paadAnual.update({ where: { id }, data: { estado: 'APROBADO' } });
   }, { timeout: 20000 });
 }
 

@@ -229,16 +229,90 @@ export interface GeneralReportData {
   elaboradoPorDireccion: boolean;
 }
 
+// Nombres de estado unificados con el prototipo SIIGPA (ENVIADO_A_REVISION siempre "En revisión").
 export const ESTADO_LABELS: Record<string, string> = {
   BORRADOR: 'Borrador',
-  ENVIADO_A_REVISION: 'Enviado a Revisión',
+  ENVIADO_A_REVISION: 'En revisión',
   OBSERVADO: 'Observado',
-  APROBADO_PEDAGOGICO: 'Aprobado Pedagógico',
-  APROBADO_DISCIPLINAR: 'Aprobado Disciplinar',
-  APROBADO_PLENO: 'Aprobado Pleno',
+  APROBADO_PEDAGOGICO: 'Aprob. pedagógico',
+  APROBADO_DISCIPLINAR: 'Aprob. disciplinar',
+  APROBADO_PLENO: 'Evaluado favorablemente',
   ELEVADO_AL_CONSEJO: 'Elevado al Consejo',
   FINALIZADO: 'Finalizado',
 };
+
+/** En proceso: todavía falta algún dictamen o corrección. */
+export const ESTADOS_ACTIVOS = ['BORRADOR', 'ENVIADO_A_REVISION', 'OBSERVADO', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR'];
+/** Históricas / aprobadas: ya cuentan con ambos dictámenes favorables. */
+export const ESTADOS_HISTORICOS = ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO', 'FINALIZADO'];
+
+/** Etapa de elaboración del documento PAAC (columna "PAAC" de la bandeja). */
+export type EtapaPaac = 'SIN_INICIAR' | 'EN_ELABORACION' | 'EN_CORRECCION' | 'PRESENTADO';
+export function etapaPaac(estado: string, iniciado: boolean): EtapaPaac {
+  if (estado === 'BORRADOR') return iniciado ? 'EN_ELABORACION' : 'SIN_INICIAR';
+  if (estado === 'OBSERVADO') return 'EN_CORRECCION';
+  return 'PRESENTADO';
+}
+export const ETAPA_PAAC: Record<EtapaPaac, { label: string; cls: string }> = {
+  SIN_INICIAR: { label: 'Sin iniciar', cls: 'text-muted' },
+  EN_ELABORACION: { label: 'En elaboración', cls: 'text-amber-700 dark:text-amber-400' },
+  EN_CORRECCION: { label: 'Correcciones', cls: 'text-amber-700 dark:text-amber-400' },
+  PRESENTADO: { label: 'Presentado', cls: 'text-emerald-700 dark:text-emerald-400' },
+};
+
+/** Dictamen visible de un área en la bandeja. */
+export type Dictamen = 'PENDIENTE' | 'FAVORABLE' | 'CON_OBSERVACIONES';
+export const DICTAMEN_LABELS: Record<Dictamen, string> = {
+  PENDIENTE: 'Pendiente',
+  FAVORABLE: 'Favorable',
+  CON_OBSERVACIONES: 'Con observaciones',
+};
+export const DICTAMEN_BADGE: Record<Dictamen, string> = {
+  PENDIENTE: 'bg-slate-500/15 text-muted',
+  FAVORABLE: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
+  CON_OBSERVACIONES: 'bg-red-500/15 text-red-700 dark:text-red-400',
+};
+
+const ESTADOS_CON_PED = ['APROBADO_PEDAGOGICO', 'APROBADO_PLENO', 'ELEVADO_AL_CONSEJO', 'FINALIZADO'];
+const ESTADOS_CON_DISC = ['APROBADO_DISCIPLINAR', 'APROBADO_PLENO', 'ELEVADO_AL_CONSEJO', 'FINALIZADO'];
+
+/**
+ * Dictámenes de UAP (pedagógico) y Dirección (disciplinar) a partir del estado y los informes guardados.
+ * La aprobación se lee del estado; "con observaciones" del informe con REQUIERE_CORRECCION o de observaciones abiertas.
+ */
+export function dictamenesPaac(p: {
+  estado: string;
+  informePedagogico?: unknown;
+  informeDisciplinar?: unknown;
+  observacionesAbiertas?: { rolAutor: string }[];
+}) {
+  const dictamen = (v: unknown) => (v && typeof v === 'object' ? (v as { dictamen?: string }).dictamen : undefined);
+  const pedApproved = ESTADOS_CON_PED.includes(p.estado);
+  const discApproved = ESTADOS_CON_DISC.includes(p.estado);
+  const abiertas = p.observacionesAbiertas ?? [];
+  const pedObservado = !pedApproved && (dictamen(p.informePedagogico) === 'REQUIERE_CORRECCION' || abiertas.some((o) => o.rolAutor === 'UAP'));
+  const discObservado =
+    !discApproved && (dictamen(p.informeDisciplinar) === 'REQUIERE_CORRECCION' || abiertas.some((o) => o.rolAutor === 'DIRECCION_CARRERA'));
+  const area = (ok: boolean, obs: boolean): Dictamen => (ok ? 'FAVORABLE' : obs ? 'CON_OBSERVACIONES' : 'PENDIENTE');
+  return { pedApproved, discApproved, ped: area(pedApproved, pedObservado), disc: area(discApproved, discObservado) };
+}
+
+/** Avance de carga: porcentaje de secciones de primer nivel con algún dato cargado. */
+export function progresoSecciones(datos: unknown): { completados: number; total: number; pct: number } {
+  const tieneDato = (v: unknown): boolean => {
+    if (v == null) return false;
+    if (typeof v === 'string') return v.trim() !== '';
+    if (typeof v === 'number') return v !== 0;
+    if (typeof v === 'boolean') return false;
+    if (Array.isArray(v)) return v.some(tieneDato);
+    if (typeof v === 'object') return Object.values(v as Record<string, unknown>).some(tieneDato);
+    return false;
+  };
+  const secciones = datos && typeof datos === 'object' && !Array.isArray(datos) ? Object.values(datos as Record<string, unknown>) : [];
+  const completados = secciones.filter(tieneDato).length;
+  const total = secciones.length;
+  return { completados, total, pct: total ? Math.round((completados / total) * 100) : 0 };
+}
 
 export const ROL_LABELS: Record<string, string> = {
   DOCENTE: 'Docente',

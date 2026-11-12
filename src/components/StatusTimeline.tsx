@@ -43,7 +43,7 @@ export function StatusTimeline({ estado, pedagogicoFavorable, disciplinarFavorab
 
   const steps = [
     { label: 'Borrador' },
-    { label: 'Enviado a Revisión' },
+    { label: 'En revisión' },
     { label: 'Aprobación UAP / Dirección' },
     { label: 'Aprobado Pleno' },
     { label: 'Elevado al Consejo', sub: numeroExpediente ? `Expediente N° ${numeroExpediente}` : undefined },

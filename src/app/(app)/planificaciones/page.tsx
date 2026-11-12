@@ -1,57 +1,67 @@
-import Image from 'next/image';
+import { Suspense } from 'react';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import { planificacionesVisiblesPara } from '@/lib/visibilidad';
-import { PlanificacionesList } from '@/components/PlanificacionesList';
+import { avancePaac } from '@/lib/dashboard-datos';
+import { dictamenesPaac } from '@/types/planificacion';
+import { PlanificacionesList, type PlanifFila } from '@/components/PlanificacionesList';
 
-export default async function PlanificacionesPage({
-  searchParams,
-}: {
-  searchParams?: { estado?: string };
-}) {
+const DESCRIPCION_ALCANCE: Record<string, string> = {
+  DOCENTE: 'Planificaciones donde sos responsable o integrás el equipo de cátedra (ciclo actual e históricos).',
+  DIRECCION_CARRERA: 'Planificaciones que evalúa tu carrera, en proceso e históricas.',
+  UAP: 'Todas las carreras y departamentos (unidad transversal).',
+  CONSEJO_DEPARTAMENTAL: 'Planificaciones elevadas al Consejo y finalizadas.',
+  ADMINISTRADOR: 'Todas las planificaciones del departamento.',
+};
+
+export default async function PlanificacionesPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user) return null;
+  const user = session.user;
 
-  const planificaciones = await planificacionesVisiblesPara(session.user);
-  const rows = planificaciones.map((p) => ({
-    id: p.id,
-    estado: p.estado,
-    cicloLectivo: p.cicloLectivo,
-    regimen: p.asignatura.regimen,
-    numeroExpediente: p.numeroExpediente,
-    numeroResolucion: p.numeroResolucion,
-    fechaAprobacionCd: p.fechaAprobacionCd ? p.fechaAprobacionCd.toISOString() : null,
-    asignatura: {
-      nombre: p.asignatura.nombre,
-      planEstudio: {
-        carrera: {
-          nombre: p.asignatura.planEstudio.carrera.nombre,
-          codigo: p.asignatura.planEstudio.carrera.codigo,
-          sede: { nombre: p.asignatura.planEstudio.carrera.sede.nombre },
-        },
-      },
-    },
-    docenteResponsable: { nombre: p.docenteResponsable.nombre, apellido: p.docenteResponsable.apellido },
-  }));
+  const planificaciones = await planificacionesVisiblesPara(user);
+  // Observaciones abiertas del PAAC (para "Observaciones pendientes" y el dictamen "Con observaciones").
+  const abiertas = await prisma.itemObservacion.findMany({
+    where: { planificacionId: { in: planificaciones.map((p) => p.id) }, documentoTipo: 'PAAC', resuelto: false },
+    select: { planificacionId: true, rolAutor: true },
+  });
+  const abiertasPor = new Map<string, { rolAutor: string }[]>();
+  for (const o of abiertas) abiertasPor.set(o.planificacionId, [...(abiertasPor.get(o.planificacionId) ?? []), o]);
+
+  const filas: PlanifFila[] = planificaciones.map((p) => {
+    const carrera = p.asignatura.planEstudio.carrera;
+    const obs = abiertasPor.get(p.id) ?? [];
+    const d = dictamenesPaac({ estado: p.estado, informePedagogico: p.informePedagogico, informeDisciplinar: p.informeDisciplinar, observacionesAbiertas: obs });
+    return {
+      id: p.id,
+      asignatura: p.asignatura.nombre,
+      carreraId: carrera.id,
+      carreraSigla: carrera.codigo,
+      carreraNombre: carrera.nombre,
+      cycle: p.cicloLectivo,
+      regimen: p.asignatura.regimen,
+      responsable: `${p.docenteResponsable.nombre} ${p.docenteResponsable.apellido}`,
+      state: p.estado,
+      iniciado: avancePaac(p.datosPaac).iniciado,
+      ped: d.ped,
+      disc: d.disc,
+      pendientes: obs.length,
+      expediente: p.numeroExpediente,
+      resolucion: p.numeroResolucion,
+      editable: user.rol === 'DOCENTE' && p.docenteResponsableId === user.id && ['BORRADOR', 'OBSERVADO'].includes(p.estado),
+    };
+  });
 
   return (
-    <div className="mx-auto w-full max-w-[1440px] space-y-5">
-      <header className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:p-6">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Gestión académica</p>
-          <h1 className="mt-1.5 text-2xl font-semibold tracking-tight text-white">Planificaciones</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-400">
-            {session.user.rol === 'ADMINISTRADOR'
-              ? 'Consultá, filtrá y revisá las planificaciones de todas las carreras.'
-              : 'Consultá tus planificaciones y encontrá rápidamente cada ciclo y estado.'}
-          </p>
-        </div>
-        <div className="flex w-fit items-center rounded-lg border border-border bg-background px-4 py-3">
-          <Image src="/unlar-logo.png" alt="Universidad Nacional de La Rioja" width={311} height={104} priority className="h-auto w-44 object-contain sm:w-52" />
-        </div>
-      </header>
-
-      <PlanificacionesList planificaciones={rows} rol={session.user.rol} initialEstado={searchParams?.estado} />
+    <div className="mx-auto w-full max-w-[1440px] space-y-6">
+      <div className="border-b border-border pb-4">
+        <h1 className="text-2xl font-bold tracking-tight text-ink">Planificaciones (PAAC)</h1>
+        <p className="mt-0.5 text-xs text-muted">{DESCRIPCION_ALCANCE[user.rol] ?? ''}</p>
+      </div>
+      <Suspense>
+        <PlanificacionesList filas={filas} />
+      </Suspense>
     </div>
   );
 }
