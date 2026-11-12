@@ -24,6 +24,8 @@ interface Props {
   canObserve: boolean;
   canResolve: boolean;
   observaciones: Observacion[];
+  /** Rol de la sesión si puede eliminar observaciones de su área (PAAD no aprobado). */
+  rolEliminacion?: string | null;
 }
 
 function obsFor(observaciones: Observacion[], paadId: string, path: string) {
@@ -56,6 +58,7 @@ export function PaadForm({
   canObserve,
   canResolve,
   observaciones,
+  rolEliminacion,
 }: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +75,7 @@ export function PaadForm({
     { nombre: 'Extensión', completa: hayTexto(form.extension) },
     { nombre: 'Gestión universitaria', completa: !!form.gestion.detalle.trim() },
     { nombre: 'Otras actividades', completa: form.otrasActividades.some(x => x.trim()) },
-    { nombre: 'Distribución horaria', completa: form.distribucionHoraria.some(f => [f.lunes, f.martes, f.miercoles, f.jueves, f.viernes, f.sabado].some(x => x?.trim())) },
+    { nombre: '8) Distribución Horaria', completa: form.distribucionHoraria.some(f => [f.lunes, f.martes, f.miercoles, f.jueves, f.viernes, f.sabado].some(x => x?.trim())) },
   ];
   const conContenido = secciones.filter(s => s.completa).length;
 
@@ -110,6 +113,7 @@ export function PaadForm({
       observaciones={obsFor(observaciones, paadId, path)}
       canObserve={canObserve}
       canResolve={canResolve}
+      rolEliminacion={rolEliminacion}
     >
       {node}
     </ObservationFieldWrapper>
@@ -137,7 +141,7 @@ export function PaadForm({
 
       <details id="paad-section-1" open className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5">
         <summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden">
-          <span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Sección 1</span><span className="mt-1 block text-sm font-semibold text-white">Actividad de enseñanza</span><span className="mt-1 block text-xs text-slate-500">Cursos, capacitaciones y materiales producidos.</span></span>
+          <span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Apartado 1</span><span className="mt-1 block text-sm font-semibold text-white">1) Actividad de enseñanza</span><span className="mt-1 block text-xs text-slate-500">Cursos, capacitaciones y materiales producidos.</span></span>
           <span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span>
         </summary>
         <div className="space-y-4">
@@ -201,7 +205,7 @@ export function PaadForm({
       </details>
 
       <details id="paad-section-2" className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5">
-        <summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Sección 2</span><span className="mt-1 block text-sm font-semibold text-white">Actividades de investigación</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
+        <summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Apartado 2</span><span className="mt-1 block text-sm font-semibold text-white">2) Actividades de investigación</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
         <div className="space-y-4">
         <RepeatableList
           label="Proyectos de investigación"
@@ -225,16 +229,16 @@ export function PaadForm({
       </details>
 
       <div className="grid gap-3 lg:grid-cols-2">
-        <details id="paad-section-3" className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5"><summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Sección 3</span><span className="mt-1 block text-sm font-semibold text-white">Formación de recursos humanos</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
+        <details id="paad-section-3" className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5"><summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Apartado 3</span><span className="mt-1 block text-sm font-semibold text-white">3) Formación de recursos humanos</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
           {wrap('formacionRecursosHumanos.detalle', <TextAreaField label="Ayudantes, adscriptos y JTP a cargo" rows={3} value={form.formacionRecursosHumanos.detalle} disabled={!editable} onChange={(v) => update((d) => (d.formacionRecursosHumanos.detalle = v))} />)}
         </details>
-        <details id="paad-section-4" className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5"><summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Sección 4</span><span className="mt-1 block text-sm font-semibold text-white">Formación académica</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
+        <details id="paad-section-4" className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5"><summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Apartado 4</span><span className="mt-1 block text-sm font-semibold text-white">4) Formación académica</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
           {wrap('formacionAcademica.detalle', <TextAreaField label="Especialización y formación profesional" rows={3} value={form.formacionAcademica.detalle} disabled={!editable} onChange={(v) => update((d) => (d.formacionAcademica.detalle = v))} />)}
         </details>
       </div>
 
       <details id="paad-section-5" className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5">
-        <summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Sección 5</span><span className="mt-1 block text-sm font-semibold text-white">Actividades de extensión</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
+        <summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Apartado 5</span><span className="mt-1 block text-sm font-semibold text-white">5) Actividades de extensión</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
         <div className="space-y-4">
         <RepeatableList
           label="Proyectos de extensión"
@@ -257,15 +261,15 @@ export function PaadForm({
         </div>
       </details>
 
-      <details id="paad-section-6" className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5"><summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Sección 6</span><span className="mt-1 block text-sm font-semibold text-white">Administración y gobierno universitario</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
+      <details id="paad-section-6" className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5"><summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Apartado 6</span><span className="mt-1 block text-sm font-semibold text-white">6) Administración y gobierno universitario</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
         {wrap('gestion.detalle', <TextAreaField label="Actividades realizadas o previstas" rows={3} value={form.gestion.detalle} disabled={!editable} onChange={(v) => update((d) => (d.gestion.detalle = v))} />)}
       </details>
 
-      <details id="paad-section-7" className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5"><summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Sección 7</span><span className="mt-1 block text-sm font-semibold text-white">Otras actividades</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
+      <details id="paad-section-7" className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5"><summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Apartado 7</span><span className="mt-1 block text-sm font-semibold text-white">7) Otras actividades</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
         {wrap('otrasActividades', <ListField label="Actividades no previstas en las secciones anteriores" value={form.otrasActividades} disabled={!editable} onChange={(v) => update((d) => (d.otrasActividades = v))} />)}
       </details>
 
-      <details id="paad-section-8" className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5"><summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Sección 8</span><span className="mt-1 block text-sm font-semibold text-white">Distribución horaria semanal</span><span className="mt-1 block text-xs text-slate-500">Indicá los días y horarios dedicados a cada actividad.</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
+      <details id="paad-section-8" className="group scroll-mt-6 rounded-xl border border-blue-100/10 bg-[#0b172b]/70 p-4 sm:p-5"><summary className="mb-4 flex cursor-pointer list-none items-start justify-between gap-4 [&::-webkit-details-marker]:hidden"><span><span className="text-[10px] font-semibold uppercase tracking-[0.13em] text-blue-300">Apartado 8</span><span className="mt-1 block text-sm font-semibold text-white">8) Distribución Horaria</span><span className="mt-1 block text-xs text-slate-500">Indicá los días y horarios dedicados a cada actividad.</span></span><span aria-hidden="true" className="mt-2 text-slate-500 transition-transform group-open:rotate-180">⌄</span></summary>
         <div className="overflow-x-auto rounded-lg border border-blue-100/10">
           <table className="w-full min-w-[720px] border-collapse text-xs">
             <thead>

@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
-export type PlanifTab = 'PAAC' | 'EQUIPO' | 'PEDAGOGICO' | 'DISCIPLINAR' | 'GENERAL';
+export type PlanifTab = 'PAAC' | 'EQUIPO' | 'INFORMES';
 
 interface PlanifState {
   selectedCycle: number;

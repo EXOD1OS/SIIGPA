@@ -123,10 +123,22 @@ html.theme-transition *::after {
   }
 }
 
+/* Hojas oficiales (informes Anexo III/IV y PAAD): copia de impresión montada en <body>, oculta en pantalla. */
+.doc-print {
+  display: none;
+}
+
 @media print {
   @page {
     size: A4;
     margin: 14mm;
+  }
+  /* Al imprimir una hoja oficial solo sale esa copia (no el documento de la página de fondo). */
+  body[data-imprimiendo] .print-area:not(.doc-print) {
+    display: none !important;
+  }
+  body[data-imprimiendo] .doc-print {
+    display: block !important;
   }
   html,
   body {

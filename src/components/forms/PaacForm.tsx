@@ -47,13 +47,15 @@ interface Props {
   canResolve: boolean;
   observaciones: Observacion[];
   infoGeneral: InfoGeneral;
+  /** Rol de la sesión si puede eliminar observaciones de su área (PAAC no finalizado). */
+  rolEliminacion?: string | null;
 }
 
 function obsFor(observaciones: Observacion[], path: string) {
   return observaciones.filter((o) => o.campoPath === path);
 }
 
-export function PaacForm({ planificacionId, data, enfoque, editable, canObserve, canResolve, observaciones, infoGeneral }: Props) {
+export function PaacForm({ planificacionId, data, enfoque, editable, canObserve, canResolve, observaciones, infoGeneral, rolEliminacion }: Props) {
   const [form, setForm] = useState<any>(data);
   const [pending, startTransition] = useTransition();
   const [saved, setSaved] = useState(false);
@@ -83,6 +85,7 @@ export function PaacForm({ planificacionId, data, enfoque, editable, canObserve,
       observaciones={obsFor(observaciones, path)}
       canObserve={canObserve}
       canResolve={canResolve}
+      rolEliminacion={rolEliminacion}
     >
       {node}
     </ObservationFieldWrapper>

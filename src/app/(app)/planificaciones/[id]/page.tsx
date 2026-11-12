@@ -15,14 +15,17 @@ import { PaacDocumentView } from '@/components/documents/PaacDocumentView';
 import { InvitarDocenteForm } from '@/components/forms/InvitarDocenteForm';
 import { GestionEquipoModal } from '@/components/admin/GestionEquipoModal';
 import { AccionesPanel } from '@/components/forms/AccionesPanel';
-import { InformePedagogicoPanel } from '@/components/forms/InformePedagogicoPanel';
-import { InformeDisciplinarPanel } from '@/components/forms/InformeDisciplinarPanel';
-import { InformeGeneralPanel } from '@/components/forms/InformeGeneralPanel';
 import { ArchivoExpedientePanel } from '@/components/forms/ArchivoExpedientePanel';
 import { PlanificacionTabs, type TabDef } from '@/components/PlanificacionTabs';
 import { SectionCard } from '@/components/forms/fields';
+import { ObservationFieldWrapper } from '@/components/ObservationFieldWrapper';
+import { VisorInformes } from '@/components/informes/VisorInformes';
+import { EvaluacionInforme } from '@/components/informes/EvaluacionInforme';
 import { permiteObservaciones } from '@/lib/observaciones';
-import type { GeneralReportData, PedagogicalReportData, DisciplinaryReportData } from '@/types/planificacion';
+import { construirContextoInformes, equipoConPaad } from '@/lib/informes-servidor';
+import { observacionSugerida, sugerirInformeDisciplinar, sugerirInformePedagogico } from '@/lib/informes';
+
+const ROL_OBS: Record<string, string> = { UAP: 'UAP', DIRECCION_CARRERA: 'Dirección', ADMINISTRADOR: 'Administración' };
 
 export default async function PlanificacionDetailPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -39,6 +42,10 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
   const editablePaac = estadoPermiteCorreccion && (esResponsable || rol === UserRole.ADMINISTRADOR);
   const canObserve = hasRole(rol, [UserRole.UAP, UserRole.DIRECCION_CARRERA]) && permiteObservaciones(planif.estado);
   const canResolveObs = (esResponsable || rol === UserRole.ADMINISTRADOR) && planif.estado === 'OBSERVADO';
+  // UAP y Dirección eliminan sus propias observaciones mientras el PAAC no esté finalizado.
+  // Elevada o finalizada: inmutable (ni edición, ni observaciones, ni informes).
+  const inmutable = ['ELEVADO_AL_CONSEJO', 'FINALIZADO'].includes(planif.estado);
+  const rolEliminacion = hasRole(rol, [UserRole.UAP, UserRole.DIRECCION_CARRERA, UserRole.ADMINISTRADOR]) && !inmutable ? rol : null;
 
   const docentesDisponibles =
     esResponsable || rol === UserRole.ADMINISTRADOR
@@ -48,27 +55,18 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
         })
       : [];
 
-  const docentesDisponiblesAdmin =
-    rol === UserRole.ADMINISTRADOR
-      ? await prisma.usuario.findMany({
-          where: { rol: UserRole.DOCENTE, NOT: { id: { in: planif.integrantes.map((p) => p.docenteId) } } },
-          orderBy: { apellido: 'asc' },
-        })
-      : [];
-
   const pendientesPaac = planif.observaciones.filter((o) => o.documentoTipo === 'PAAC' && !o.resuelto).length;
-  const paadsAnuales = await prisma.paadAnual.findMany({ where: { cicloLectivo: planif.cicloLectivo, docenteId: { in: planif.integrantes.map(p => p.docenteId) } }, include: { presentaciones: { select: { id: true } } } });
+  const [equipo, contexto] = await Promise.all([equipoConPaad(planif), construirContextoInformes(planif)]);
 
-  const informePedagogico = planif.informePedagogico as unknown as PedagogicalReportData | null;
-  const informeDisciplinar = planif.informeDisciplinar as unknown as DisciplinaryReportData | null;
-  const informeGeneral = planif.informeGeneral as unknown as GeneralReportData | null;
-
-  const equipoPaadResumen = planif.integrantes.map((p) => ({
-    docenteId: p.docenteId,
-    nombre: `${p.docente.nombre} ${p.docente.apellido}`,
-    cargo: p.cargoEnCatedra,
-    estado: paadsAnuales.find(a => a.docenteId === p.docenteId)?.presentaciones.length ? 'PRESENTO' : 'NO_PRESENTO',
-  }));
+  // Emisión de informes: SOLO desde aquí y SOLO el informe del rol (UAP → Pedagógico, Dirección → Disciplinar).
+  const evaluaUap = rol === UserRole.UAP && ['ENVIADO_A_REVISION', 'APROBADO_DISCIPLINAR'].includes(planif.estado);
+  const evaluaDireccion = rol === UserRole.DIRECCION_CARRERA && ['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO'].includes(planif.estado);
+  const evaluacionComun = {
+    planificacionId: planif.id,
+    pendientes: pendientesPaac,
+    encabezado: contexto.encabezado,
+    equipo: contexto.equipo,
+  };
 
   const tabs: TabDef[] = [
     {
@@ -85,6 +83,7 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
               editable={editablePaac}
               canObserve={canObserve}
               canResolve={canResolveObs}
+              rolEliminacion={rolEliminacion}
               observaciones={planif.observaciones.filter((o) => o.documentoTipo === 'PAAC')}
               infoGeneral={{
                 sede: planif.asignatura.planEstudio.carrera.sede.nombre,
@@ -95,7 +94,7 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
                 regimen: planif.asignatura.regimen,
                 creditoHorario: planif.asignatura.creditoHorario,
                 contenidosMinimos: planif.asignatura.contenidosMinimosOficiales,
-                equipoCatedra: equipoPaadResumen.map((p) => ({ cargo: p.cargo, nombre: p.nombre })),
+                equipoCatedra: equipo.map((p) => ({ cargo: p.cargo, nombre: p.nombre })),
               }}
             />
           }
@@ -108,70 +107,53 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
       label: 'Equipo y PAAD',
       content: (
         <SectionCard title="Presentación del PAAD anual por docente">
-          <p className="text-sm text-gray-400 mb-4">El PAAD es personal. Su presentación no bloquea el envío ni la aprobación de este PAAC.</p>
-          {(esResponsable || rol === UserRole.ADMINISTRADOR) && ['BORRADOR', 'OBSERVADO'].includes(planif.estado) &&
-            <InvitarDocenteForm planificacionId={planif.id} docentes={docentesDisponibles} />}
-          <div className="space-y-3 mt-4">
-            {planif.integrantes.map(p => {
-              const anual = paadsAnuales.find(a => a.docenteId === p.docenteId);
-              return <div key={p.id} className="border border-border rounded-lg p-3 text-sm">
-                <p>{p.docente.nombre} {p.docente.apellido} · {p.cargoEnCatedra}</p>
-                <p className="text-gray-400">{anual?.presentaciones.length ? 'Presentado' : 'Pendiente de presentar'} · {anual ? PAAD_LABELS[anual.estado] : 'Sin PAAD habilitado'}</p>
-                {anual && rol !== UserRole.CONSEJO_DEPARTAMENTAL &&
-                  <Link className="text-primary" href={'/paads/' + anual.id}>Ver PAAD anual</Link>}
-              </div>;
+          <p className="mb-4 text-sm text-muted">El PAAD es personal. Su presentación no bloquea el envío ni la aprobación de este PAAC.</p>
+          {(esResponsable || rol === UserRole.ADMINISTRADOR) && ['BORRADOR', 'OBSERVADO'].includes(planif.estado) && (
+            <InvitarDocenteForm planificacionId={planif.id} docentes={docentesDisponibles} />
+          )}
+          <div className="mt-4 space-y-3">
+            {equipo.map((p) => {
+              const anual = planif.integrantes.find((i) => i.docenteId === p.docenteId);
+              return (
+                <div key={p.docenteId} className="rounded-lg border border-border p-3 text-sm">
+                  <p className="text-ink">
+                    {p.nombre} · {p.cargo}
+                  </p>
+                  <p className="text-muted">
+                    {p.presento ? 'Presentó' : 'No presentó'} · {p.paadEstado ? PAAD_LABELS[p.paadEstado as keyof typeof PAAD_LABELS] : 'Sin PAAD habilitado'}
+                  </p>
+                  {p.paadEstado && anual && rol !== UserRole.CONSEJO_DEPARTAMENTAL && (
+                    <PaadLink docenteId={p.docenteId} ciclo={planif.cicloLectivo} asignaturaId={planif.asignaturaId} />
+                  )}
+                </div>
+              );
             })}
           </div>
         </SectionCard>
       ),
     },
     {
-      key: 'PEDAGOGICO',
-      label: 'Informe Pedagógico',
+      key: 'INFORMES',
+      label: 'Informes',
       content: (
-        <InformePedagogicoPanel
-          planificacionId={planif.id}
-          estado={planif.estado}
-          rol={rol}
-          equipoPaad={equipoPaadResumen}
-          informePedagogico={informePedagogico}
-        />
-      ),
-    },
-    {
-      key: 'DISCIPLINAR',
-      label: 'Informe Disciplinar',
-      content: (
-        <InformeDisciplinarPanel
-          planificacionId={planif.id}
-          estado={planif.estado}
-          rol={rol}
-          equipoPaad={equipoPaadResumen}
-          informeDisciplinar={informeDisciplinar}
-        />
-      ),
-    },
-    {
-      key: 'GENERAL',
-      label: 'Informe General',
-      content: (
-        <InformeGeneralPanel planificacionId={planif.id} estado={planif.estado} rol={rol} informeGeneral={informeGeneral} />
+        <SectionCard title="Informes del PAAC (Ord. HCS N° 219/2022)">
+          <VisorInformes contexto={contexto} />
+        </SectionCard>
       ),
     },
   ];
 
   return (
-    <div className="max-w-4xl space-y-8 pb-16">
+    <div className="max-w-5xl space-y-8 pb-16">
       <div>
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold text-white">{planif.asignatura.nombre}</h1>
-          <StatusBadge estado={planif.estado} />
+          <h1 className="text-2xl font-semibold text-ink">{planif.asignatura.nombre}</h1>
+          <StatusBadge estado={planif.estado} pendientes={pendientesPaac} />
         </div>
-        <p className="text-gray-400 text-sm mt-1">
-          {planif.asignatura.planEstudio.carrera.nombre} &middot; Ciclo {planif.cicloLectivo} &middot;{' '}
-          {planif.asignatura.planEstudio.ordenanza}
+        <p className="mt-1 text-sm text-muted">
+          {planif.asignatura.planEstudio.carrera.nombre} &middot; Ciclo {planif.cicloLectivo} &middot; {planif.asignatura.planEstudio.ordenanza}
         </p>
-        <p className="text-gray-500 text-xs mt-1">
+        <p className="mt-1 text-xs text-muted">
           Responsable: {planif.docenteResponsable.nombre} {planif.docenteResponsable.apellido}
         </p>
       </div>
@@ -179,8 +161,8 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
       <div className="no-print">
         <StatusTimeline
           estado={planif.estado}
-          pedagogicoFavorable={informePedagogico?.dictamen === 'FAVORABLE'}
-          disciplinarFavorable={informeDisciplinar?.dictamen === 'CUMPLE'}
+          pedagogicoFavorable={contexto.pedApproved}
+          disciplinarFavorable={contexto.discApproved}
           numeroExpediente={planif.numeroExpediente}
           numeroResolucion={planif.numeroResolucion}
         />
@@ -197,9 +179,26 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
               nombre: `${p.docente.nombre} ${p.docente.apellido}`,
               cargo: p.cargoEnCatedra,
             }))}
-            docentesDisponibles={docentesDisponiblesAdmin.map((d) => ({ id: d.id, nombre: `${d.nombre} ${d.apellido}` }))}
+            docentesDisponibles={docentesDisponibles.map((d) => ({ id: d.id, nombre: `${d.nombre} ${d.apellido}` }))}
           />
         </div>
+      )}
+
+      {evaluaUap && (
+        <EvaluacionInforme
+          {...evaluacionComun}
+          area="uap"
+          sugerido={sugerirInformePedagogico(planif.datosPaac)}
+          obsSugerida={observacionSugerida('uap', pendientesPaac)}
+        />
+      )}
+      {evaluaDireccion && (
+        <EvaluacionInforme
+          {...evaluacionComun}
+          area="direccion"
+          sugerido={sugerirInformeDisciplinar(planif.datosPaac, equipo)}
+          obsSugerida={observacionSugerida('direccion', pendientesPaac)}
+        />
       )}
 
       <div className="no-print">
@@ -208,33 +207,72 @@ export default async function PlanificacionDetailPage({ params }: { params: { id
           estado={planif.estado}
           rol={rol}
           esResponsable={esResponsable}
-          informeGeneralListo={!!informeGeneral?.elaboradoPorUap && !!informeGeneral?.elaboradoPorDireccion}
-          numeroExpediente={planif.numeroExpediente}
-          numeroResolucion={planif.numeroResolucion}
+          protocolo={{
+            id: planif.id,
+            estado: planif.estado,
+            asignatura: planif.asignatura.nombre,
+            detalle: [
+              planif.asignatura.planEstudio.carrera.codigo,
+              planif.asignatura.planEstudio.ordenanza,
+              `Ciclo ${planif.cicloLectivo}`,
+              `${planif.docenteResponsable.nombre} ${planif.docenteResponsable.apellido}`,
+            ].join(' · '),
+            expediente: planif.numeroExpediente,
+            fechaElevacion: planif.fechaElevacion ? planif.fechaElevacion.toLocaleDateString('es-AR') : null,
+            pedApproved: contexto.pedApproved,
+            discApproved: contexto.discApproved,
+          }}
         />
       </div>
 
-      <ArchivoExpedientePanel planificacionId={planif.id} estado={planif.estado} />
+      <ArchivoExpedientePanel
+        planificacionId={planif.id}
+        estado={planif.estado}
+        puedeConsolidar={hasRole(rol, [UserRole.ADMINISTRADOR, UserRole.CONSEJO_DEPARTAMENTAL])}
+      />
 
       <PlanificacionTabs tabs={tabs} />
 
       <section className="no-print">
         <SectionCard title="Historial de Observaciones">
           <div className="space-y-2">
-            {planif.observaciones.map((o) => (
-              <div key={o.id} className="flex items-center justify-between text-sm border border-border rounded-lg px-3 py-2">
-                <span className={o.resuelto ? 'text-gray-500 line-through' : 'text-gray-300'}>
-                  <strong>[{o.rolAutor}]</strong> {o.documentoTipo} &middot; {o.campoPath}: {o.mensaje}
-                </span>
-                <span className={`text-xs ${o.resuelto ? 'text-success' : 'text-warning'}`}>
-                  {o.resuelto ? 'Resuelto' : 'Pendiente'}
-                </span>
-              </div>
-            ))}
-            {planif.observaciones.length === 0 && <p className="text-sm text-gray-500">Sin observaciones registradas.</p>}
+            {planif.observaciones.map((o) =>
+              o.resuelto ? (
+                <div key={o.id} className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
+                  <span className="text-muted line-through">
+                    <strong>[{ROL_OBS[o.rolAutor] ?? o.rolAutor}]</strong> {o.campoPath}: {o.mensaje}
+                  </span>
+                  <span className="text-xs text-success">Subsanada</span>
+                </div>
+              ) : (
+                <ObservationFieldWrapper
+                  key={o.id}
+                  planificacionId={planif.id}
+                  documentoTipo="PAAC"
+                  fieldPath={o.campoPath}
+                  observaciones={[o]}
+                  canResolve={canResolveObs && !inmutable}
+                  rolEliminacion={rolEliminacion}
+                >
+                  <p className="font-mono text-[11px] text-muted">{o.campoPath}</p>
+                </ObservationFieldWrapper>
+              ),
+            )}
+            {planif.observaciones.length === 0 && <p className="text-sm text-muted">Sin observaciones registradas.</p>}
           </div>
         </SectionCard>
       </section>
     </div>
+  );
+}
+
+/** Enlace al PAAD anual del integrante con los Aspectos Generales proyectados sobre esta cátedra. */
+async function PaadLink({ docenteId, ciclo, asignaturaId }: { docenteId: string; ciclo: number; asignaturaId: string }) {
+  const paad = await prisma.paadAnual.findUnique({ where: { docenteId_cicloLectivo: { docenteId, cicloLectivo: ciclo } }, select: { id: true } });
+  if (!paad) return null;
+  return (
+    <Link className="text-primary hover:underline" href={`/paads/${paad.id}?asignatura=${asignaturaId}`}>
+      Ver PAAD anual
+    </Link>
   );
 }

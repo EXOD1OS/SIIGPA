@@ -11,7 +11,7 @@ const DESCRIPCION_ALCANCE: Record<string, string> = {
   DOCENTE: 'Planificaciones donde sos responsable o integrás el equipo de cátedra (ciclo actual e históricos).',
   DIRECCION_CARRERA: 'Planificaciones que evalúa tu carrera, en proceso e históricas.',
   UAP: 'Todas las carreras y departamentos (unidad transversal).',
-  CONSEJO_DEPARTAMENTAL: 'Planificaciones elevadas al Consejo y finalizadas.',
+  CONSEJO_DEPARTAMENTAL: 'Planificaciones evaluadas favorablemente, elevadas al Consejo y finalizadas (protocolización en 2 instancias).',
   ADMINISTRADOR: 'Todas las planificaciones del departamento.',
 };
 
@@ -21,6 +21,7 @@ export default async function PlanificacionesPage() {
   const user = session.user;
 
   const planificaciones = await planificacionesVisiblesPara(user);
+  const puedeProtocolizar = user.rol === 'CONSEJO_DEPARTAMENTAL' || user.rol === 'ADMINISTRADOR';
   // Observaciones abiertas del PAAC (para "Observaciones pendientes" y el dictamen "Con observaciones").
   const abiertas = await prisma.itemObservacion.findMany({
     where: { planificacionId: { in: planificaciones.map((p) => p.id) }, documentoTipo: 'PAAC', resuelto: false },
@@ -50,6 +51,20 @@ export default async function PlanificacionesPage() {
       expediente: p.numeroExpediente,
       resolucion: p.numeroResolucion,
       editable: user.rol === 'DOCENTE' && p.docenteResponsableId === user.id && ['BORRADOR', 'OBSERVADO'].includes(p.estado),
+      // Consejo Departamental (y Administración): protocolización en 2 instancias desde la bandeja.
+      protocolo:
+        puedeProtocolizar && ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO'].includes(p.estado)
+          ? {
+              id: p.id,
+              estado: p.estado,
+              asignatura: p.asignatura.nombre,
+              detalle: [carrera.codigo, p.asignatura.planEstudio.ordenanza, `Ciclo ${p.cicloLectivo}`, `${p.docenteResponsable.nombre} ${p.docenteResponsable.apellido}`].join(' · '),
+              expediente: p.numeroExpediente,
+              fechaElevacion: p.fechaElevacion ? p.fechaElevacion.toLocaleDateString('es-AR') : null,
+              pedApproved: d.pedApproved,
+              discApproved: d.discApproved,
+            }
+          : null,
     };
   });
 

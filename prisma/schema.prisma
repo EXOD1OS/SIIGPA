@@ -152,6 +152,9 @@ model Planificacion {
   informeGeneral       Json?
   numeroExpediente     String?
   numeroResolucion     String?
+  // 1.ª instancia del Consejo Departamental: caratulación del expediente y elevación.
+  fechaElevacion       DateTime?
+  // 2.ª instancia: fecha de la Resolución (Consejo Superior) que finaliza la planificación.
   fechaAprobacionCd    DateTime?
   asignatura           Asignatura        @relation(fields: [asignaturaId], references: [id])
   docenteResponsable   Usuario           @relation("DocenteResponsable", fields: [docenteResponsableId], references: [id])

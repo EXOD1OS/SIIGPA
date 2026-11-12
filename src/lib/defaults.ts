@@ -1,4 +1,4 @@
-import type { PaacTraditionalData, PaacCompetenciasData, PaadData, GeneralReportData } from '@/types/planificacion';
+import type { PaacTraditionalData, PaacCompetenciasData, PaadData } from '@/types/planificacion';
 
 export function defaultPaacTraditional(encabezado: PaacTraditionalData['encabezado']): PaacTraditionalData {
   return {
@@ -81,15 +81,5 @@ export function defaultPaad(): PaadData {
       { actividad: 'FORMACION' },
       { actividad: 'GESTION' },
     ],
-  };
-}
-
-export function defaultInformeGeneral(): GeneralReportData {
-  return {
-    conclusionConjunta: '',
-    observacionesGenerales: '',
-    recomendacion: 'FAVORABLE',
-    elaboradoPorUap: false,
-    elaboradoPorDireccion: false,
   };
 }

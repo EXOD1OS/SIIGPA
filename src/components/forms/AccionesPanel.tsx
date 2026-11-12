@@ -3,134 +3,66 @@
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserRole } from '@prisma/client';
-import { enviarARevision, elevarAlConsejo, asignarExpediente, formalizarResolucion } from '@/actions/planificacion.actions';
-import { SectionCard, TextField } from './fields';
+import { enviarARevision } from '@/actions/planificacion.actions';
 import { hasRole } from '@/lib/roles';
+import { AccionProtocolo, type DocProtocolo } from '@/components/planificaciones/ProtocolizacionModal';
+import { IconLock } from '@/components/layout/icons';
 
 interface Props {
   planificacionId: string;
   estado: string;
   rol: UserRole;
   esResponsable: boolean;
-  informeGeneralListo: boolean;
-  numeroExpediente: string | null;
-  numeroResolucion: string | null;
+  /** Datos para la protocolización del Consejo Departamental (2 instancias). */
+  protocolo: DocProtocolo;
 }
 
-function ActionButton({
-  label,
-  pending,
-  onClick,
-  variant = 'primary',
-}: {
-  label: string;
-  pending: boolean;
-  onClick: () => void;
-  variant?: 'primary' | 'danger' | 'success';
-}) {
-  const styles = {
-    primary: 'bg-primary hover:bg-primary-hover',
-    danger: 'bg-danger/80 hover:bg-danger',
-    success: 'bg-success/80 hover:bg-success',
-  } as const;
-  return (
-    <button
-      type="button"
-      disabled={pending}
-      onClick={onClick}
-      className={`text-white text-sm font-medium px-4 py-2 rounded-lg disabled:opacity-50 transition-colors ${styles[variant]}`}
-    >
-      {pending ? 'Procesando...' : label}
-    </button>
-  );
-}
-
-export function AccionesPanel({
-  planificacionId,
-  estado,
-  rol,
-  esResponsable,
-  informeGeneralListo,
-  numeroExpediente,
-  numeroResolucion,
-}: Props) {
+/** Acciones del circuito: envío a revisión (docente) y protocolización en 2 instancias (Consejo). */
+export function AccionesPanel({ planificacionId, estado, rol, esResponsable, protocolo }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [nroExpedienteInput, setNroExpedienteInput] = useState('');
-  const [nroResolucionInput, setNroResolucionInput] = useState('');
-
-  function run(fn: () => Promise<unknown>) {
-    setError(null);
-    startTransition(async () => {
-      try {
-        const result = await fn();
-        if (result && typeof result === 'object' && 'error' in result && typeof result.error === 'string') {
-          setError(result.error);
-          return;
-        }
-        router.refresh();
-      } catch (e: any) {
-        setError(e.message ?? 'Ocurrió un error.');
-      }
-    });
-  }
 
   const puedeEnviar = ['BORRADOR', 'OBSERVADO'].includes(estado) && (esResponsable || rol === UserRole.ADMINISTRADOR);
-  const puedeElevar = estado === 'APROBADO_PLENO' && hasRole(rol, [UserRole.DIRECCION_CARRERA, UserRole.ADMINISTRADOR]);
-  const puedeAsignarExpediente =
-    estado === 'ELEVADO_AL_CONSEJO' && !numeroExpediente && hasRole(rol, [UserRole.CONSEJO_DEPARTAMENTAL, UserRole.ADMINISTRADOR]);
-  const puedeFormalizarResolucion =
-    estado === 'ELEVADO_AL_CONSEJO' &&
-    !!numeroExpediente &&
-    !numeroResolucion &&
-    hasRole(rol, [UserRole.CONSEJO_DEPARTAMENTAL, UserRole.ADMINISTRADOR]);
+  const puedeProtocolizar = ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO'].includes(estado) && hasRole(rol, [UserRole.CONSEJO_DEPARTAMENTAL, UserRole.ADMINISTRADOR]);
+  const inmutable = ['ELEVADO_AL_CONSEJO', 'FINALIZADO'].includes(estado);
 
-  if (!puedeEnviar && !puedeElevar && !puedeAsignarExpediente && !puedeFormalizarResolucion) return null;
+  if (!puedeEnviar && !puedeProtocolizar && !inmutable) return null;
 
   return (
     <div className="space-y-3">
+      {inmutable && (
+        <p role="note" className="flex items-start gap-2 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-3 py-2.5 text-xs text-indigo-800 dark:text-indigo-200">
+          <IconLock className="mt-0.5 h-4 w-4 shrink-0" />
+          {estado === 'FINALIZADO'
+            ? 'Planificación finalizada con Resolución: el documento, sus observaciones e informes son inmutables.'
+            : 'Planificación elevada al Consejo: el documento, sus observaciones e informes quedan en solo lectura.'}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         {puedeEnviar && (
-          <ActionButton label="Enviar a Revisión" pending={pending} onClick={() => run(() => enviarARevision(planificacionId))} />
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              setError(null);
+              startTransition(async () => {
+                try {
+                  await enviarARevision(planificacionId);
+                  router.refresh();
+                } catch (e) {
+                  setError(e instanceof Error ? e.message : 'Ocurrió un error.');
+                }
+              });
+            }}
+            className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-hover disabled:opacity-50"
+          >
+            {pending ? 'Procesando…' : 'Enviar a Revisión'}
+          </button>
         )}
-        {puedeElevar && (
-          <ActionButton
-            label={informeGeneralListo ? 'Elevar al Consejo Departamental' : 'Elevar al Consejo (falta Informe General)'}
-            pending={pending}
-            onClick={() => run(() => elevarAlConsejo(planificacionId))}
-          />
-        )}
+        {puedeProtocolizar && <AccionProtocolo doc={protocolo} />}
       </div>
-
       {error && <p className="text-sm text-danger">{error}</p>}
-
-      {puedeAsignarExpediente && (
-        <SectionCard title="Consejo Departamental — Asignación de Expediente">
-          <p className="text-sm text-gray-400">
-            El Consejo aprueba la elevación y asigna número de expediente. La resolución se formaliza en un paso posterior.
-          </p>
-          <TextField label="Número de expediente" value={nroExpedienteInput} onChange={setNroExpedienteInput} />
-          <ActionButton
-            label="Asignar expediente"
-            pending={pending}
-            onClick={() => run(() => asignarExpediente(planificacionId, nroExpedienteInput))}
-          />
-        </SectionCard>
-      )}
-
-      {puedeFormalizarResolucion && (
-        <SectionCard title="Consejo Departamental — Formalización con Resolución">
-          <p className="text-sm text-gray-400">Expediente N° {numeroExpediente}. Cargá el número de resolución para finalizar.</p>
-          <TextField label="Número de resolución" value={nroResolucionInput} onChange={setNroResolucionInput} />
-          <ActionButton
-            label="Formalizar y finalizar"
-            variant="success"
-            pending={pending}
-            onClick={() => run(() => formalizarResolucion(planificacionId, nroResolucionInput))}
-          />
-        </SectionCard>
-      )}
     </div>
   );
 }

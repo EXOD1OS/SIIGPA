@@ -1,5 +1,8 @@
 import Image from 'next/image';
+import { Suspense } from 'react';
 import { prisma } from '@/lib/prisma';
+import { aspectosSinCatedra, catedraInicial, catedrasPaad } from '@/lib/paad-encabezado';
+import { PaadEncabezadoDinamico } from './paad/PaadEncabezadoDinamico';
 import { carrerasPaad, paadVisible, PAAD_LABELS, PAAD_REVISABLES, type PaadActor } from '@/lib/paad';
 import { PaadForm } from './forms/PaadForm';
 import { PaadControls } from './forms/PaadControls';
@@ -9,9 +12,18 @@ import { ViewToggle } from './ViewToggle';
 import { notFound } from 'next/navigation';
 import type { PaadData } from '@/types/planificacion';
 
-export async function PaadDetail({ id, actor, showInstitutionalLogo = true }: { id: string; actor: PaadActor; showInstitutionalLogo?: boolean }) {
+export async function PaadDetail({ id, actor, showInstitutionalLogo = true, asignaturaId }: {
+  id: string; actor: PaadActor; showInstitutionalLogo?: boolean;
+  /** Materia desde la que se consulta el PAAD (proyecta los Aspectos Generales). */
+  asignaturaId?: string | null;
+}) {
   const p = await paadVisible(prisma, actor, id).catch(() => null);
   if (!p) notFound();
+  const catedras = await catedrasPaad(p.docenteId, p.cicloLectivo);
+  const inicial = catedraInicial(catedras, { asignaturaId, carreraId: actor.rol === 'DIRECCION_CARRERA' ? actor.carreraId : p.carreraEvaluadoraId });
+  const sinCatedra = aspectosSinCatedra(p.docente, p.cicloLectivo);
+  // UAP y Dirección eliminan sus observaciones mientras el PAAD no esté aprobado.
+  const rolEliminacion = ['UAP', 'DIRECCION_CARRERA', 'ADMINISTRADOR'].includes(actor.rol) && p.estado !== 'APROBADO' ? actor.rol : null;
   const propio = actor.rol === 'ADMINISTRADOR' || (actor.rol === 'DOCENTE' && actor.id === p.docenteId);
   const editable = propio && !p.conflictoMigracion && ['BORRADOR', 'OBSERVADO'].includes(p.estado);
   const revision = p.presentaciones[0];
@@ -68,8 +80,13 @@ export async function PaadDetail({ id, actor, showInstitutionalLogo = true }: { 
     </section>
 
     {p.conflictoMigracion && <p className="rounded-xl border border-amber-300/20 bg-amber-300/[0.06] p-4 text-sm leading-6 text-amber-100">Administración debe resolver las copias anteriores. El formulario y la presentación están bloqueados.</p>}
+    <Suspense>
+      <PaadEncabezadoDinamico catedras={catedras} catedraInicial={inicial} aspectosSinCatedra={sinCatedra} datos={data}
+        estado={p.estado} ciclo={p.cicloLectivo} docente={nombre} carreraEval={p.carreraEvaluadora?.nombre ?? 'Dirección pendiente'} />
+    </Suspense>
     <PaadControls key={p.id + ':' + (revision?.id ?? '') + ':' + (p.fuenteLegacyId ?? '')} paadId={p.id} presentacionId={revision?.id}
       canReview={revisable && !revision?.dictamenes.some(d => d.rolAutor === actor.rol)}
+      area={actor.rol === 'UAP' ? 'uap' : actor.rol === 'DIRECCION_CARRERA' ? 'direccion' : null} pendientes={pendientes}
       canAssign={actor.rol === 'ADMINISTRADOR' && p.estado === 'BORRADOR' && !p.presentaciones.length}
       carreraId={p.carreraEvaluadoraId} carreras={carreras}
       fuentes={actor.rol === 'ADMINISTRADOR' && p.conflictoMigracion ? copias.map(c => ({ id: c.id,
@@ -77,13 +94,13 @@ export async function PaadDetail({ id, actor, showInstitutionalLogo = true }: { 
     <ViewToggle form={<PaadForm key={p.id + ':' + (revision?.numero ?? 0) + ':' + (p.fuenteLegacyId ?? '')} paadId={p.id} presentacionId={revision?.id}
       canPresent={editable && !!p.carreraEvaluadoraId && !p.observaciones.some(o => !o.resuelto)}
       data={data} editable={editable} canObserve={revisable}
-      canResolve={propio && !p.conflictoMigracion && p.estado === 'OBSERVADO'} observaciones={p.observaciones} />}
+      canResolve={propio && !p.conflictoMigracion && p.estado === 'OBSERVADO'} observaciones={p.observaciones} rolEliminacion={rolEliminacion} />}
       document={<PaadDocumentView data={p.datosPaad as unknown as PaadData} docenteNombre={nombre} cargo={'Ciclo ' + p.cicloLectivo} />} />
     <section className="space-y-3 rounded-xl border border-white/10 bg-[#0d1b32]/90 p-4 shadow-md shadow-blue-950/10 sm:p-5"><div><p className="text-xs font-medium text-blue-300">Seguimiento</p><h2 className="mt-1 text-base font-semibold text-white">Historial de observaciones</h2></div>
       {p.observaciones.map(o => <div key={o.id} className="border border-border rounded-lg p-3">
         <p className="text-xs text-gray-500">{o.rolAutor} · {o.autor.nombre} {o.autor.apellido} · {o.createdAt.toLocaleString('es-AR')} · {o.campoPath}</p>
         <ObservationFieldWrapper paadAnualId={p.id} presentacionId={revision?.id} documentoTipo="PAAD" fieldPath={o.campoPath}
-          observaciones={[o]} canResolve={propio && p.estado === 'OBSERVADO' && !p.conflictoMigracion}>
+          observaciones={[o]} canResolve={propio && p.estado === 'OBSERVADO' && !p.conflictoMigracion} rolEliminacion={rolEliminacion}>
           <p>{o.resuelto ? 'Resuelto: ' + o.mensaje : 'Pendiente'}</p>
         </ObservationFieldWrapper>
       </div>)}

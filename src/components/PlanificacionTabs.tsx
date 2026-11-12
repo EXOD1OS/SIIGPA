@@ -24,12 +24,12 @@ export function PlanificacionTabs({ tabs }: { tabs: TabDef[] }) {
             type="button"
             onClick={() => dispatch(setDocumentType(tab.key))}
             className={`relative px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${
-              active === tab.key ? 'text-primary border-primary' : 'text-gray-400 border-transparent hover:text-gray-200'
+              active === tab.key ? 'text-primary border-primary' : 'text-muted border-transparent hover:text-ink'
             }`}
           >
             {tab.label}
             {!!tab.pendientes && tab.pendientes > 0 && (
-              <span className="ml-2 inline-flex items-center justify-center text-[10px] bg-danger/20 text-red-300 border border-danger/40 rounded-full px-1.5 py-0.5">
+              <span className="ml-2 inline-flex items-center justify-center rounded-full border border-amber-500/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">
                 {tab.pendientes}
               </span>
             )}

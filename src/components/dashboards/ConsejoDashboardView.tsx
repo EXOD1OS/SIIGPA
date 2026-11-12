@@ -18,12 +18,13 @@ import {
   pct,
   tarjetaDe,
 } from './DashboardKit';
+import { AccionProtocolo } from '@/components/planificaciones/ProtocolizacionModal';
 import { ESTADOS_FAVORABLES, contar, ordenanzaDe, paacsDe, type DatosDashboard, type FiltrosPaac, type NavDashboard, type PaacResumen } from './datos';
 
 type FiltroConsejo = 'pendientes' | 'finalizadas' | 'favorables';
 const PENDIENTES = ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO'];
 /** Estados que el Consejo puede abrir (mismo criterio que `lib/visibilidad.ts`). */
-const ABRIBLES = ['ELEVADO_AL_CONSEJO', 'FINALIZADO'];
+const ABRIBLES = ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO', 'FINALIZADO'];
 
 /**
  * Inicio del Consejo Departamental: cátedras evaluadas favorablemente, elevadas y protocolizadas.
@@ -198,12 +199,36 @@ export function ConsejoDashboardView({ datos, nav }: { datos: DatosDashboard; na
               {lista.map((d) => {
                 const tarjeta = tarjetaDe(d);
                 tarjeta.acento = d.state === 'FINALIZADO' ? COLOR.aprobado : d.state === 'ELEVADO_AL_CONSEJO' ? COLOR.elevado : COLOR.pleno;
-                tarjeta.extra = d.expediente ? (
+                const expediente = d.expediente ? (
                   <span className="text-right text-[11px] leading-tight" title={d.state === 'FINALIZADO' ? 'Planificación cerrada e inmutable' : undefined}>
                     <span className="block font-mono font-semibold text-ink">{d.expediente}</span>
                     <span className="block font-mono text-muted">{d.resolucion || 'Resolución pendiente'}</span>
                   </span>
-                ) : undefined;
+                ) : null;
+                // 1.ª instancia (APROBADO_PLENO): «Cargar Expediente»; 2.ª (ELEVADO_AL_CONSEJO): «Cargar Resolución».
+                const protocolo = PENDIENTES.includes(d.state) ? (
+                  <AccionProtocolo
+                    detenerPropagacion
+                    className="relative z-10"
+                    doc={{
+                      id: d.id,
+                      estado: d.state,
+                      asignatura: d.asignatura,
+                      detalle: [d.carreraSigla, d.ordenanza, `Ciclo ${d.cycle}`, d.responsable].filter(Boolean).join(' · '),
+                      expediente: d.expediente,
+                      fechaElevacion: d.fechaElevacion,
+                      pedApproved: d.pedApproved,
+                      discApproved: d.discApproved,
+                    }}
+                  />
+                ) : null;
+                tarjeta.extra =
+                  expediente || protocolo ? (
+                    <span className="flex items-center gap-2 whitespace-nowrap">
+                      {expediente}
+                      {protocolo}
+                    </span>
+                  ) : undefined;
                 return <SelectableCatedraCard key={d.id} c={tarjeta} onOpen={ABRIBLES.includes(d.state) ? () => nav.onOpenDoc(d.id) : undefined} />;
               })}
             </ul>

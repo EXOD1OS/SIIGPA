@@ -70,7 +70,7 @@ export function PaadDocumentView({ data, docenteNombre, cargo }: { data: PaadDat
         <DocField label="Detalle" value={data.otrasActividades.join('; ')} />
       </DocSection>
 
-      <DocSection title="8) Distribución Horaria de sus Actividades">
+      <DocSection title="8) Distribución Horaria">
         <DocTable
           headers={['Actividad', ...DIAS.map((d) => DIA_LABELS[d])]}
           rows={data.distribucionHoraria.map((fila) => [

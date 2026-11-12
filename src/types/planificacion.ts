@@ -215,20 +215,6 @@ export interface DisciplinaryReportData {
   observaciones?: string;
 }
 
-// ============================================================================
-// Informe General de PAAC — elaborado en conjunto por UAP y Dirección de
-// Carrera una vez que la planificación tiene aprobación pedagógica y
-// disciplinar plena. Es requisito para poder elevarla al Consejo Departamental.
-// ============================================================================
-
-export interface GeneralReportData {
-  conclusionConjunta: string;
-  observacionesGenerales?: string;
-  recomendacion: 'FAVORABLE' | 'NO_FAVORABLE';
-  elaboradoPorUap: boolean;
-  elaboradoPorDireccion: boolean;
-}
-
 // Nombres de estado unificados con el prototipo SIIGPA (ENVIADO_A_REVISION siempre "En revisión").
 export const ESTADO_LABELS: Record<string, string> = {
   BORRADOR: 'Borrador',

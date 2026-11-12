@@ -9,13 +9,19 @@ import { hasRole } from '@/lib/roles';
 import { asegurarPaad } from '@/lib/paad';
 import { planificacionVisiblePara } from '@/lib/visibilidad';
 import { permiteObservaciones, tieneObservacionesPendientes } from '@/lib/observaciones';
-import { archivarExpedienteFinal } from '@/lib/archivo-expediente';
+import { consolidarYSubirExpediente } from '@/lib/archivo-expediente';
+import { construirContextoInformes } from '@/lib/informes-servidor';
+import type { PaacData } from '@/types/planificacion';
 import type {
-  PaacData,
-  PedagogicalReportData,
-  DisciplinaryReportData,
-  GeneralReportData,
-} from '@/types/planificacion';
+  ContextoInformes,
+  InformeDisciplinarDatos,
+  InformeDisciplinarGuardado,
+  InformePedagogicoDatos,
+  InformePedagogicoGuardado,
+} from '@/types/informes';
+
+/** Elevada o finalizada: nadie edita el PAAC, sus observaciones ni sus informes. */
+const ESTADOS_INMUTABLES: string[] = ['ELEVADO_AL_CONSEJO', 'FINALIZADO'];
 
 async function requireSession() {
   const session = await getServerSession(authOptions);
@@ -38,6 +44,7 @@ async function requirePlanificacionVisible(planificacionId: string, session: Awa
 }
 
 function requireEstadoEditable(estado: string, tienePendientes = false) {
+  if (ESTADOS_INMUTABLES.includes(estado)) throw new Error('La planificación fue elevada al Consejo o finalizada: es de solo lectura.');
   if (!['BORRADOR', 'OBSERVADO'].includes(estado) && !(tienePendientes && permiteObservaciones(estado))) {
     throw new Error('No editable en el estado actual.');
   }
@@ -250,176 +257,180 @@ export async function marcarComoObservado(planifId: string) {
   return updated;
 }
 
-export async function registrarAprobacionPedagogica(planifId: string, dictamen: PedagogicalReportData) {
+const ESTADOS_EN_EVALUACION = ['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR'];
+const fechaInforme = () => new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+/**
+ * Emisión del Informe Pedagógico (Anexo III, Ord. 219/22). Solo la UAP y solo desde adentro del PAAC:
+ * guarda el JSON estructurado y registra el dictamen favorable del área.
+ */
+export async function registrarAprobacionPedagogica(planifId: string, input: { pedagogico: InformePedagogicoDatos; observaciones: string }) {
   const session = await requireSession();
-  if (!hasRole(session.user.rol, [UserRole.UAP, UserRole.ADMINISTRADOR])) throw new Error('No autorizado.');
+  if (session.user.rol !== UserRole.UAP) throw new Error('Solo la UAP emite el Informe Pedagógico.');
 
   const planif = await requirePlanificacionVisible(planifId, session);
-  if (!['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR'].includes(planif.estado)) {
-    throw new Error('El estado actual no permite registrar el dictamen pedagógico.');
+  if (!ESTADOS_EN_EVALUACION.includes(planif.estado) || planif.estado === 'APROBADO_PEDAGOGICO') {
+    throw new Error('El estado actual no permite emitir el Informe Pedagógico.');
   }
+  requireSinObservacionesPendientes(planif, 'No se puede emitir el informe favorable mientras existan observaciones pendientes.');
 
-  if (dictamen.dictamen === 'REQUIERE_CORRECCION') {
-    const updated = await prisma.planificacion.update({
-      where: { id: planifId },
-      data: { informePedagogico: dictamen as any, estado: 'OBSERVADO' },
-    });
-    revalidatePlanif(planifId);
-    return updated;
-  }
-
-  requireSinObservacionesPendientes(
-    planif,
-    'No se puede registrar un dictamen favorable mientras existan observaciones pendientes.',
-  );
-
+  const informe: InformePedagogicoGuardado = {
+    modelo: 'ORD_219_2022',
+    dictamen: 'FAVORABLE',
+    pedagogico: input.pedagogico,
+    observaciones: input.observaciones.trim(),
+    firmante: session.user.name ?? 'UAP',
+    fecha: fechaInforme(),
+  };
   const nuevoEstado: PlanifStatus = planif.estado === 'APROBADO_DISCIPLINAR' ? 'APROBADO_PLENO' : 'APROBADO_PEDAGOGICO';
   const updated = await prisma.planificacion.update({
     where: { id: planifId },
-    data: { informePedagogico: dictamen as any, estado: nuevoEstado },
+    data: { informePedagogico: informe as any, estado: nuevoEstado },
   });
 
   revalidatePlanif(planifId);
   return updated;
 }
 
-export async function registrarAprobacionDisciplinar(planifId: string, dictamen: DisciplinaryReportData) {
+/**
+ * Emisión del Informe Disciplinar (Anexo IV, Ord. 219/22). Solo la Dirección de Carrera evaluadora
+ * (la visibilidad ya restringe a su carrera) y solo desde adentro del PAAC.
+ */
+export async function registrarAprobacionDisciplinar(planifId: string, input: { disciplinar: InformeDisciplinarDatos; observaciones: string }) {
   const session = await requireSession();
-  if (!hasRole(session.user.rol, [UserRole.DIRECCION_CARRERA, UserRole.ADMINISTRADOR])) throw new Error('No autorizado.');
+  if (session.user.rol !== UserRole.DIRECCION_CARRERA) throw new Error('Solo la Dirección de Carrera emite el Informe Disciplinar.');
 
   const planif = await requirePlanificacionVisible(planifId, session);
-  if (!['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR'].includes(planif.estado)) {
-    throw new Error('El estado actual no permite registrar el dictamen disciplinar.');
+  if (!ESTADOS_EN_EVALUACION.includes(planif.estado) || planif.estado === 'APROBADO_DISCIPLINAR') {
+    throw new Error('El estado actual no permite emitir el Informe Disciplinar.');
   }
+  requireSinObservacionesPendientes(planif, 'No se puede emitir el informe favorable mientras existan observaciones pendientes.');
 
-  if (dictamen.dictamen === 'REQUIERE_CORRECCION') {
-    const updated = await prisma.planificacion.update({
-      where: { id: planifId },
-      data: { informeDisciplinar: dictamen as any, estado: 'OBSERVADO' },
-    });
-    revalidatePlanif(planifId);
-    return updated;
-  }
-
-  requireSinObservacionesPendientes(
-    planif,
-    'No se puede registrar un dictamen favorable mientras existan observaciones pendientes.',
-  );
-
+  const informe: InformeDisciplinarGuardado = {
+    modelo: 'ORD_219_2022',
+    dictamen: 'CUMPLE',
+    disciplinar: input.disciplinar,
+    observaciones: input.observaciones.trim(),
+    firmante: session.user.name ?? 'Dirección de Carrera',
+    fecha: fechaInforme(),
+  };
   const nuevoEstado: PlanifStatus = planif.estado === 'APROBADO_PEDAGOGICO' ? 'APROBADO_PLENO' : 'APROBADO_DISCIPLINAR';
   const updated = await prisma.planificacion.update({
     where: { id: planifId },
-    data: { informeDisciplinar: dictamen as any, estado: nuevoEstado },
+    data: { informeDisciplinar: informe as any, estado: nuevoEstado },
   });
 
   revalidatePlanif(planifId);
   return updated;
 }
 
-export async function guardarInformeGeneral(planifId: string, informe: GeneralReportData) {
+/** Informes de un PAAC en solo lectura (modal de la bandeja). Respeta la visibilidad del rol. */
+export async function obtenerInformesAction(planifId: string): Promise<ContextoInformes> {
   const session = await requireSession();
-  if (!hasRole(session.user.rol, [UserRole.UAP, UserRole.DIRECCION_CARRERA, UserRole.ADMINISTRADOR])) {
-    throw new Error('No autorizado.');
+  const planif = await requirePlanificacionVisible(planifId, session);
+  return construirContextoInformes(planif);
+}
+
+/**
+ * UAP y Dirección eliminan solo las observaciones de su área (el Administrador, cualquiera),
+ * siempre que el PAAC no esté FINALIZADO.
+ */
+export async function eliminarObservacionAction(observacionId: string) {
+  const session = await requireSession();
+  const rol = session.user.rol;
+  if (!hasRole(rol, [UserRole.UAP, UserRole.DIRECCION_CARRERA, UserRole.ADMINISTRADOR])) throw new Error('No autorizado.');
+
+  const obs = await prisma.itemObservacion.findUnique({ where: { id: observacionId } });
+  if (!obs) throw new Error('Observación no encontrada.');
+  if (rol !== UserRole.ADMINISTRADOR && obs.rolAutor !== rol) throw new Error('Solo podés eliminar observaciones de tu área.');
+
+  const planif = await requirePlanificacionVisible(obs.planificacionId, session);
+  if (ESTADOS_INMUTABLES.includes(planif.estado)) {
+    throw new Error('La planificación fue elevada al Consejo o finalizada: sus observaciones no se pueden eliminar.');
   }
 
-  const planif = await requirePlanificacionVisible(planifId, session);
-  if (planif.estado !== 'APROBADO_PLENO') throw new Error('El informe general solo puede elaborarse con aprobación plena.');
-
-  const informeConAutoria: GeneralReportData = {
-    ...informe,
-    elaboradoPorUap: informe.elaboradoPorUap || session.user.rol === UserRole.UAP,
-    elaboradoPorDireccion: informe.elaboradoPorDireccion || session.user.rol === UserRole.DIRECCION_CARRERA,
-  };
-
-  const updated = await prisma.planificacion.update({
-    where: { id: planifId },
-    data: { informeGeneral: informeConAutoria as any },
-  });
-
-  revalidatePlanif(planifId);
-  return updated;
+  await prisma.itemObservacion.delete({ where: { id: observacionId } });
+  revalidatePlanif(obs.planificacionId);
 }
 
-export async function elevarAlConsejo(planifId: string) {
+
+/** Fecha `aaaa-mm-dd` del formulario (o vacía = hoy) → Date a mediodía local, sin corrimientos de zona. */
+function fechaProtocolo(iso: string | undefined) {
+  if (!iso) return new Date();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) throw new Error('La fecha no tiene un formato válido.');
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) throw new Error('La fecha no es válida.');
+  return d;
+}
+
+/**
+ * Protocolización · 1.ª instancia (Consejo Departamental): caratula el expediente de un PAAC con
+ * aprobación plena y lo eleva al Consejo (APROBADO_PLENO → ELEVADO_AL_CONSEJO). La resolución queda en null.
+ */
+export async function registrarExpedienteAction(planifId: string, input: { numeroExpediente: string; fecha?: string }) {
   const session = await requireSession();
-  if (!hasRole(session.user.rol, [UserRole.DIRECCION_CARRERA, UserRole.ADMINISTRADOR])) throw new Error('No autorizado.');
+  if (!hasRole(session.user.rol, [UserRole.CONSEJO_DEPARTAMENTAL, UserRole.ADMINISTRADOR])) throw new Error('No autorizado.');
+  const numero = input.numeroExpediente.trim();
+  if (!numero) throw new Error('El número de expediente es obligatorio.');
+  const fecha = fechaProtocolo(input.fecha);
 
   const planif = await requirePlanificacionVisible(planifId, session);
-  if (planif.estado !== 'APROBADO_PLENO') throw new Error('La planificación debe estar Aprobada Plena para elevarla.');
+  if (planif.estado !== 'APROBADO_PLENO') throw new Error('Solo se caratula el expediente de una planificación evaluada favorablemente (Aprobado Pleno).');
   requireSinObservacionesPendientes(planif, 'No se puede elevar una planificación con observaciones pendientes.');
-  if (!planif.informeGeneral) throw new Error('Falta elaborar el Informe General de PAAC junto a la UAP.');
-  const informeGeneral = planif.informeGeneral as unknown as GeneralReportData;
-  if (!informeGeneral.elaboradoPorUap || !informeGeneral.elaboradoPorDireccion) {
-    throw new Error('El Informe General debe contar con la participación de UAP y Dirección de Carrera.');
-  }
 
-  const updated = await prisma.planificacion.update({
-    where: { id: planifId },
-    data: { estado: 'ELEVADO_AL_CONSEJO' },
+  // Compare-and-set sobre el estado: evita doble caratulación concurrente.
+  const { count } = await prisma.planificacion.updateMany({
+    where: { id: planifId, estado: 'APROBADO_PLENO', numeroExpediente: null },
+    data: { numeroExpediente: numero, fechaElevacion: fecha, numeroResolucion: null, estado: 'ELEVADO_AL_CONSEJO' },
   });
+  if (count === 0) throw new Error('La planificación cambió de estado. Actualizá la página.');
 
   revalidatePlanif(planifId);
-  return updated;
+  revalidatePath('/dashboard');
 }
 
-export async function asignarExpediente(planifId: string, nroExpediente: string) {
+/**
+ * Protocolización · 2.ª instancia: registra la Resolución del Consejo Superior, consolida el expediente
+ * inmutable en S3/MinIO (si está configurado) y finaliza la planificación (ELEVADO_AL_CONSEJO → FINALIZADO).
+ */
+export async function registrarResolucionAction(planifId: string, input: { numeroResolucion: string; fecha?: string }): Promise<{ error?: string; archivados?: number }> {
   const session = await requireSession();
   if (!hasRole(session.user.rol, [UserRole.CONSEJO_DEPARTAMENTAL, UserRole.ADMINISTRADOR])) throw new Error('No autorizado.');
+  const numero = input.numeroResolucion.trim();
+  if (!numero) throw new Error('El número de resolución es obligatorio.');
+  const fecha = fechaProtocolo(input.fecha);
 
   const planif = await requirePlanificacionVisible(planifId, session);
-  if (planif.estado !== 'ELEVADO_AL_CONSEJO') throw new Error('La planificación debe estar elevada al consejo.');
-  if (!nroExpediente.trim()) throw new Error('El número de expediente es obligatorio.');
-  if (planif.numeroExpediente) throw new Error('Ya hay un expediente asignado.');
+  if (planif.estado !== 'ELEVADO_AL_CONSEJO') throw new Error('La planificación debe estar elevada al Consejo.');
+  if (!planif.numeroExpediente) throw new Error('Primero hay que registrar el número de expediente.');
+  if (planif.numeroResolucion) throw new Error('Ya hay una resolución registrada.');
 
-  const updated = await prisma.planificacion.update({
-    where: { id: planifId },
-    data: { numeroExpediente: nroExpediente },
-  });
-
-  revalidatePlanif(planifId);
-  return updated;
-}
-
-export async function formalizarResolucion(planifId: string, nroResolucion: string) {
-  const session = await requireSession();
-  if (!hasRole(session.user.rol, [UserRole.CONSEJO_DEPARTAMENTAL, UserRole.ADMINISTRADOR])) throw new Error('No autorizado.');
-
-  const planif = await requirePlanificacionVisible(planifId, session);
-  if (planif.estado !== 'ELEVADO_AL_CONSEJO') throw new Error('La planificación debe estar elevada al consejo.');
-  if (!planif.numeroExpediente) throw new Error('Primero hay que asignar el número de expediente.');
-  if (!nroResolucion.trim()) throw new Error('El número de resolución es obligatorio.');
-  if (planif.numeroResolucion) throw new Error('Ya hay una resolución asignada.');
-
-  const fechaAprobacion = new Date();
-  let updated;
+  let archivados = 0;
   try {
-    updated = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "Planificacion" WHERE id = ${planifId} FOR UPDATE`;
       const actual = await tx.planificacion.findUniqueOrThrow({ where: { id: planifId } });
-      if (actual.estado !== 'ELEVADO_AL_CONSEJO') throw new Error('La planificación ya no está elevada al consejo.');
-      if (!actual.numeroExpediente) throw new Error('Primero hay que asignar el número de expediente.');
-      if (actual.numeroResolucion) throw new Error('Ya hay una resolución asignada.');
+      if (actual.estado !== 'ELEVADO_AL_CONSEJO') throw new Error('La planificación ya no está elevada al Consejo.');
+      if (!actual.numeroExpediente) throw new Error('Primero hay que registrar el número de expediente.');
+      if (actual.numeroResolucion) throw new Error('Ya hay una resolución registrada.');
 
-      await archivarExpedienteFinal(tx, planifId, actual.numeroExpediente, nroResolucion.trim(), fechaAprobacion);
-      return tx.planificacion.update({
+      archivados = (await consolidarYSubirExpediente(tx, planifId, actual.numeroExpediente, numero, fecha)).length;
+      await tx.planificacion.update({
         where: { id: planifId },
-        data: {
-          numeroResolucion: nroResolucion.trim(),
-          fechaAprobacionCd: fechaAprobacion,
-          estado: 'FINALIZADO',
-        },
+        data: { numeroResolucion: numero, fechaAprobacionCd: fecha, estado: 'FINALIZADO' },
       });
     }, { maxWait: 10_000, timeout: 120_000 });
   } catch (error) {
     const statusCode = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
     if (statusCode === 403) {
       return {
-        error: 'El almacenamiento de expedientes rechazo la escritura (S3 403). Revisa que las credenciales de la aplicacion tengan permiso s3:PutObject sobre el bucket y la ruta planificaciones/*.',
+        error: 'El almacenamiento de expedientes rechazó la escritura (S3 403). Revisá que las credenciales tengan permiso s3:PutObject sobre el bucket y la ruta planificaciones/*.',
       };
     }
     throw error;
   }
 
   revalidatePlanif(planifId);
-  return updated;
+  revalidatePath('/dashboard');
+  return { archivados };
 }

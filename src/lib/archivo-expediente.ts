@@ -14,8 +14,9 @@ const TIPOS_ARCHIVABLES: ArchivoExpedienteTipo[] = [
   'PAAD',
   'INFORME_PEDAGOGICO',
   'INFORME_DISCIPLINAR',
-  'INFORME_GENERAL',
 ];
+// El "Informe General" ya no forma parte del circuito: los únicos informes del PAAC son el
+// Pedagógico (UAP) y el Disciplinar (Dirección). El valor del enum queda solo por datos históricos.
 
 let client: S3Client | undefined;
 let bucketReady: Promise<void> | undefined;
@@ -116,7 +117,7 @@ const TITULOS: Record<ArchivoExpedienteTipo, string> = {
   PAAD: 'Plan Anual de Actividades del Docente (PAAD)',
   INFORME_PEDAGOGICO: 'Informe Pedagógico — UAP',
   INFORME_DISCIPLINAR: 'Informe Disciplinar — Dirección de Carrera',
-  INFORME_GENERAL: 'Informe General de PAAC',
+  INFORME_GENERAL: 'Informe General de PAAC (histórico)',
 };
 
 type ArchivoParaGenerar = {
@@ -129,7 +130,6 @@ type ArchivoParaGenerar = {
 function exigirDictamenesAprobados(planif: {
   informePedagogico: Prisma.JsonValue | null;
   informeDisciplinar: Prisma.JsonValue | null;
-  informeGeneral: Prisma.JsonValue | null;
 }, tipos: ArchivoExpedienteTipo[]) {
   const errores: string[] = [];
   if (tipos.includes('INFORME_PEDAGOGICO')) {
@@ -140,16 +140,6 @@ function exigirDictamenesAprobados(planif: {
     const informe = planif.informeDisciplinar as unknown as { dictamen?: string } | null;
     if (informe?.dictamen !== 'CUMPLE') errores.push('el Informe Disciplinar no tiene dictamen de cumplimiento');
   }
-  if (tipos.includes('INFORME_GENERAL')) {
-    const informe = planif.informeGeneral as unknown as {
-      recomendacion?: string;
-      elaboradoPorUap?: boolean;
-      elaboradoPorDireccion?: boolean;
-    } | null;
-    if (informe?.recomendacion !== 'FAVORABLE' || !informe.elaboradoPorUap || !informe.elaboradoPorDireccion) {
-      errores.push('el Informe General no está completo y recomendado favorablemente');
-    }
-  }
   if (errores.length) throw new Error(`No se puede archivar el expediente: ${errores.join('; ')}.`);
 }
 
@@ -159,7 +149,6 @@ function prepararArchivos(planif: {
   datosPaac: Prisma.JsonValue;
   informePedagogico: Prisma.JsonValue | null;
   informeDisciplinar: Prisma.JsonValue | null;
-  informeGeneral: Prisma.JsonValue | null;
   asignatura: {
     nombre: string;
     planEstudio: { ordenanza: string; carrera: { nombre: string; sede: { nombre: string } } };
@@ -203,10 +192,6 @@ const archivos: ArchivoParaGenerar[] = [];
   if (tipos.includes('INFORME_DISCIPLINAR')) {
     archivos.push({ tipo: 'INFORME_DISCIPLINAR', nombreArchivo: 'informe-disciplinar.pdf', datos: planif.informeDisciplinar });
   }
-  if (tipos.includes('INFORME_GENERAL')) {
-    archivos.push({ tipo: 'INFORME_GENERAL', nombreArchivo: 'informe-general.pdf', datos: planif.informeGeneral });
-  }
-
   return archivos;
 }
 
@@ -295,6 +280,29 @@ export async function archivarExpedienteFinal(
   }
 
   return metadata;
+}
+
+/** true si las variables S3/MinIO están cargadas (sin ellas la finalización no sube PDF). */
+export function almacenamientoConfigurado() {
+  return ['S3_ENDPOINT', 'S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'].every((k) => !!process.env[k]);
+}
+
+/**
+ * Consolida el expediente inmutable (PDF de PAAC, PAAD e informes) y lo sube a S3/MinIO dentro de la
+ * transacción de finalización. Si el almacenamiento no está configurado, no archiva y devuelve [].
+ */
+export async function consolidarYSubirExpediente(
+  tx: Prisma.TransactionClient,
+  planificacionId: string,
+  numeroExpediente: string,
+  numeroResolucion: string,
+  fechaAprobacion: Date,
+) {
+  if (!almacenamientoConfigurado()) {
+    console.warn(`[expediente] S3 no configurado: la planificación ${planificacionId} se finaliza sin archivo PDF.`);
+    return [];
+  }
+  return archivarExpedienteFinal(tx, planificacionId, numeroExpediente, numeroResolucion, fechaAprobacion);
 }
 
 export async function obtenerArchivoExpediente(id: string) {

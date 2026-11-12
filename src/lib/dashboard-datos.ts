@@ -92,6 +92,7 @@ export async function cargarDatosDashboard(user: Usuario, ciclo: number): Promis
       avance: avancePaac(p.datosPaac).pct,
       expediente: p.numeroExpediente,
       resolucion: p.numeroResolucion,
+      fechaElevacion: p.fechaElevacion ? p.fechaElevacion.toLocaleDateString('es-AR') : null,
       comments: p.observaciones.map(obs),
     };
   });

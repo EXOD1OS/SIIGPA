@@ -2,13 +2,17 @@ import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { etiquetaTipoArchivo } from '@/lib/archivo-expediente';
 import { SectionCard } from './fields';
+import { ConsolidarExpedienteButton } from './ConsolidarExpedienteButton';
 
 export async function ArchivoExpedientePanel({
   planificacionId,
   estado,
+  puedeConsolidar = false,
 }: {
   planificacionId: string;
   estado: string;
+  /** Administración / Consejo: puede (re)generar el expediente si quedó sin archivos. */
+  puedeConsolidar?: boolean;
 }) {
   if (estado !== 'FINALIZADO') return null;
 
@@ -25,8 +29,8 @@ export async function ArchivoExpedientePanel({
             {archivos.map((archivo) => (
               <li key={archivo.id} className="flex flex-col justify-between gap-1 rounded-lg border border-border px-3 py-2 sm:flex-row sm:items-center">
                 <div>
-                  <p className="text-sm font-medium text-gray-200">{etiquetaTipoArchivo(archivo.tipo)}</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm font-medium text-ink">{etiquetaTipoArchivo(archivo.tipo)}</p>
+                  <p className="text-xs text-muted">
                     {archivo.nombreArchivo} · {(archivo.sizeBytes / 1024).toFixed(1)} KB
                   </p>
                 </div>
@@ -41,9 +45,12 @@ export async function ArchivoExpedientePanel({
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-gray-400">
-            No hay archivos registrados para este expediente. Verificá la configuración del almacenamiento antes de cerrar la planificación.
-          </p>
+          <>
+            <p className="text-sm text-muted">
+              No hay archivos registrados para este expediente. Verificá la configuración del almacenamiento S3/MinIO.
+            </p>
+            {puedeConsolidar && <ConsolidarExpedienteButton planificacionId={planificacionId} />}
+          </>
         )}
       </SectionCard>
     </section>

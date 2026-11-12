@@ -27,14 +27,9 @@ test('genera un PDF con encabezado de expediente y contenido anidado', async () 
   assert.ok(pdf.byteLength > 500);
 });
 
-test('archiva por defecto PAAC, PAAD y los tres informes', () => {
-  assert.deepEqual(tiposPdfExpediente(''), [
-    'PAAC',
-    'PAAD',
-    'INFORME_PEDAGOGICO',
-    'INFORME_DISCIPLINAR',
-    'INFORME_GENERAL',
-  ]);
+test('archiva por defecto PAAC, PAAD y los dos informes (sin Informe General)', () => {
+  assert.deepEqual(tiposPdfExpediente(''), ['PAAC', 'PAAD', 'INFORME_PEDAGOGICO', 'INFORME_DISCIPLINAR']);
+  assert.throws(() => tiposPdfExpediente('INFORME_GENERAL'), /tipos no admitidos/);
 });
 
 test('permite limitar los tipos almacenados y elimina duplicados', () => {
@@ -44,7 +39,7 @@ test('permite limitar los tipos almacenados y elimina duplicados', () => {
 test('rechaza tipos de PDF no reconocidos en la configuración', () => {
   assert.throws(() => tiposPdfExpediente('PAAC,INFORME_INEXISTENTE'), /tipos no admitidos/);
 });
-test('aplica el diseño con escudo a los cuatro documentos archivados', async () => {
+test('aplica el diseño con escudo a los documentos archivados', async () => {
   const contexto = {
     asignatura: 'Álgebra',
     carrera: 'Ingeniería en Sistemas de Información',
@@ -59,7 +54,6 @@ test('aplica el diseño con escudo a los cuatro documentos archivados', async ()
     { tipo: 'PAAC', titulo: 'Plan Anual de Actividades de Cátedra (PAAC)', datos: { encabezado: { asignatura: 'Álgebra' }, fundamentacion: { importanciaAsignatura: 'Texto de prueba' } } },
     { tipo: 'INFORME_PEDAGOGICO', titulo: 'Informe Pedagógico — UAP', datos: { aspectosGenerales: { introduccion: 'PRESENTA_COMPLETA' }, aspectosCurriculares: { contenidos: 'DESARROLLADOS_EN_UNIDADES' }, dictamen: 'FAVORABLE' } },
     { tipo: 'INFORME_DISCIPLINAR', titulo: 'Informe Disciplinar — Dirección de Carrera', datos: { contenidos: 'CUMPLE', trabajosPracticos: { tp: 'ACORDE' }, bibliografia: { basica: 'PRESENTA' }, dictamen: 'CUMPLE' } },
-    { tipo: 'INFORME_GENERAL', titulo: 'Informe General de PAAC', datos: { conclusionConjunta: 'Aprobado', recomendacion: 'FAVORABLE', elaboradoPorUap: true, elaboradoPorDireccion: true } },
   ] as const;
   for (const documento of documentos) {
     const pdf = await generarPdfExpediente({ ...documento, contexto });

@@ -51,6 +51,8 @@ export interface PaacResumen {
   avance: number;
   expediente: string | null;
   resolucion: string | null;
+  /** Fecha de caratulación/elevación (1.ª instancia del Consejo), ya formateada. */
+  fechaElevacion: string | null;
   comments: ObsResumen[];
 }
 

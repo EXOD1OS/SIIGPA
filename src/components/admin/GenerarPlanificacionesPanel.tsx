@@ -26,12 +26,12 @@ export function GenerarPlanificacionesPanel() {
   }
 
   return (
-    <div className="rounded-xl border border-blue-100/10 bg-[#09172b]/65 p-4 sm:p-5">
-      <div className="flex items-center gap-2 text-sm font-medium text-white">
+    <div className="rounded-xl border border-border bg-background p-4 sm:p-5">
+      <div className="flex items-center gap-2 text-sm font-medium text-ink">
         <CalendarIcon />
         <span>Elegí el año lectivo</span>
       </div>
-      <p className="mt-1 text-xs leading-5 text-slate-400">Solo completa los borradores que faltan.</p>
+      <p className="mt-1 text-xs leading-5 text-muted">Solo completa los borradores que faltan.</p>
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="w-full sm:max-w-36">
           <NumberField label="Ciclo lectivo" value={cicloLectivo} onChange={setCicloLectivo} />
@@ -40,15 +40,15 @@ export function GenerarPlanificacionesPanel() {
           type="button"
           disabled={pending}
           onClick={generar}
-          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-950/30 transition hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+          className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-wait disabled:opacity-60 sm:w-auto"
         >
           {pending ? <><Spinner /> Preparando…</> : <>Iniciar ciclo lectivo <ArrowIcon /></>}
         </button>
       </div>
-      {error && <p role="alert" className="mt-3 rounded-lg border border-rose-400/20 bg-rose-400/[0.08] px-3 py-2 text-sm text-rose-100">{error}</p>}
+      {error && <p role="alert" className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300">{error}</p>}
       {resultado && (
-        <div role="status" className="mt-4 space-y-2 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.06] p-3 text-xs leading-5 text-slate-200">
-          <p className="font-medium text-emerald-100">Ciclo {cicloLectivo} procesado</p>
+        <div role="status" className="mt-4 space-y-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs leading-5 text-ink">
+          <p className="font-medium text-emerald-700 dark:text-emerald-300">Ciclo {cicloLectivo} procesado</p>
           <p>{resultado.creadas} borradores creados · {resultado.asignacionesCopiadas} integrantes copiados · {resultado.yaExistentes} ya existentes.</p>
           {resultado.responsablesProvisionales.length > 0 && <p>{resultado.responsablesProvisionales.length} materias tienen responsable provisional; revisá esas designaciones.</p>}
           {resultado.sinEquipo.length > 0 && <p>{resultado.sinEquipo.length} materias sin equipo docente: {resultado.sinEquipo.join(', ')}.</p>}
@@ -59,7 +59,7 @@ export function GenerarPlanificacionesPanel() {
 }
 
 function CalendarIcon() {
-  return <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-blue-200" stroke="currentColor" strokeWidth="1.6"><rect x="2.5" y="4" width="15" height="13" rx="2" /><path d="M6.5 2.5v3M13.5 2.5v3M2.5 8h15M6 11h2m4 0h2m-8 3h2" /></svg>;
+  return <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" className="h-4 w-4 text-primary" stroke="currentColor" strokeWidth="1.6"><rect x="2.5" y="4" width="15" height="13" rx="2" /><path d="M6.5 2.5v3M13.5 2.5v3M2.5 8h15M6 11h2m4 0h2m-8 3h2" /></svg>;
 }
 
 function ArrowIcon() {

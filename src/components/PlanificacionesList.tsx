@@ -7,6 +7,8 @@ import { useAppDispatch, useAppSelector } from '@/redux/hooks';
 import { setSelectedCycle } from '@/redux/slices/planificationSlice';
 import { StatusBadge } from '@/components/StatusBadge';
 import { IconLock } from '@/components/layout/icons';
+import { InformesModal } from '@/components/informes/InformesModal';
+import { AccionProtocolo, type DocProtocolo } from '@/components/planificaciones/ProtocolizacionModal';
 import {
   DICTAMEN_BADGE,
   DICTAMEN_LABELS,
@@ -38,6 +40,8 @@ export interface PlanifFila {
   resolucion: string | null;
   /** La sesión puede editar el PAAC (docente responsable, en Borrador u Observado). */
   editable: boolean;
+  /** Consejo / Administración: datos de la protocolización pendiente (null = no corresponde). */
+  protocolo: DocProtocolo | null;
 }
 
 type Vista = 'activas' | 'historicas';
@@ -131,6 +135,8 @@ function Bandeja({ filas, params }: { filas: PlanifFila[]; params: URLSearchPara
   const [filtroEstado, setFiltroEstado] = useState(ini.state ?? TODOS);
   const [filtroRegimen, setFiltroRegimen] = useState(ini.regimen ?? TODOS);
   const [pagina, setPagina] = useState(1);
+  const [informesId, setInformesId] = useState<string | null>(null);
+  const filaInformes = informesId ? filas.find((f) => f.id === informesId) : undefined;
   // 0 = todos los ciclos. Se sincroniza con Redux (lo muestra el Header); un deep-link con ciclo manda.
   const [filtroCiclo, setFiltroCiclo] = useState<number>(ini.ciclo ?? cicloRedux);
   const cambiarCiclo = (c: number) => {
@@ -348,16 +354,16 @@ function Bandeja({ filas, params }: { filas: PlanifFila[]; params: URLSearchPara
         <table className="w-full min-w-[1180px] table-fixed border-collapse text-left text-xs">
           <thead>
             <tr className="border-b border-border bg-background text-muted">
-              <th scope="col" className={`${thCls} w-[18%] pl-4 sm:pl-5`}>
+              <th scope="col" className={`${thCls} w-[16%] pl-4 sm:pl-5`}>
                 Asignatura
               </th>
               <th scope="col" className={`${thCls} w-[6%]`}>
                 Carrera
               </th>
-              <th scope="col" className={`${thCls} w-[6%]`}>
+              <th scope="col" className={`${thCls} w-[5%]`}>
                 Ciclo
               </th>
-              <th scope="col" className={`${thCls} w-[13%]`}>
+              <th scope="col" className={`${thCls} w-[11%]`}>
                 Responsable
               </th>
               <th scope="col" className={`${thCls} w-[12%]`}>
@@ -372,7 +378,7 @@ function Bandeja({ filas, params }: { filas: PlanifFila[]; params: URLSearchPara
               <th scope="col" className={`${thCls} w-[12%]`}>
                 Expediente / Resolución
               </th>
-              <th scope="col" className={`${thCls} w-[6%] pr-4 text-right sm:pr-5`}>
+              <th scope="col" className={`${thCls} w-[12%] pr-4 text-right sm:pr-5`}>
                 Acciones
               </th>
             </tr>
@@ -431,9 +437,23 @@ function Bandeja({ filas, params }: { filas: PlanifFila[]; params: URLSearchPara
                   )}
                 </td>
                 <td className="px-3 py-3 pr-4 text-right align-middle sm:pr-5">
-                  <Link href={`/planificaciones/${f.id}`} className={btnFila} aria-label={`Abrir planificación de ${f.asignatura}`}>
-                    Abrir
-                  </Link>
+                  <div className="flex flex-wrap items-center justify-end gap-2 whitespace-nowrap">
+                    {f.protocolo && <AccionProtocolo doc={f.protocolo} />}
+                    {/* Solo consulta: se habilita cuando hay al menos un informe emitido (dictamen favorable). */}
+                    <button
+                      type="button"
+                      onClick={() => setInformesId(f.id)}
+                      disabled={f.ped !== 'FAVORABLE' && f.disc !== 'FAVORABLE'}
+                      title={f.ped === 'FAVORABLE' || f.disc === 'FAVORABLE' ? undefined : 'Aún no hay informes emitidos'}
+                      aria-label={`Ver informes de ${f.asignatura}`}
+                      className={`${btnFila} disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:bg-surface disabled:hover:text-ink`}
+                    >
+                      Informes
+                    </button>
+                    <Link href={`/planificaciones/${f.id}`} className={btnFila} aria-label={`Abrir planificación de ${f.asignatura}`}>
+                      Abrir
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}
@@ -482,6 +502,16 @@ function Bandeja({ filas, params }: { filas: PlanifFila[]; params: URLSearchPara
             </button>
           </div>
         </nav>
+      )}
+
+      {filaInformes && (
+        <InformesModal
+          planificacionId={filaInformes.id}
+          asignatura={filaInformes.asignatura}
+          estado={filaInformes.state}
+          subtitulo={`${filaInformes.carreraSigla} · Ciclo ${filaInformes.cycle} · Responsable: ${filaInformes.responsable}`}
+          onClose={() => setInformesId(null)}
+        />
       )}
     </section>
   );

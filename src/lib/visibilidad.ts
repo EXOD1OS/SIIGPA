@@ -9,7 +9,8 @@ const include = {
 
 type SessionUser = { id: string; rol: UserRole; carreraId: string | null };
 
-const ESTADOS_VISIBLES_AL_CONSEJO: PlanifStatus[] = ['ELEVADO_AL_CONSEJO', 'FINALIZADO'];
+// APROBADO_PLENO: el Consejo caratula el expediente (1.ª instancia) y lo eleva.
+const ESTADOS_VISIBLES_AL_CONSEJO: PlanifStatus[] = ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO', 'FINALIZADO'];
 
 // La carrera responsable de evaluar disciplinarmente una asignatura es la propia,
 // salvo que esté explícitamente delegada a otra (caso de materias como Derecho
