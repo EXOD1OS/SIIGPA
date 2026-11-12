@@ -6,7 +6,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { operarPaad, puedeVerPaad, resolverObservacionPersonal } from '@/lib/paad';
 import { elegirFuenteMigracion } from '@/lib/migrar-paad';
-import type { PaadData } from '@/types/planificacion';
+import type { PaadContenido } from '@/prototipo/types/paad';
 
 async function actor() {
   const session = await getServerSession(authOptions);
@@ -20,7 +20,8 @@ function refrescar() {
   revalidatePath('/admin');
   revalidatePath('/dashboard');
 }
-export async function guardarBorradorPaad(paadId: string, datos: PaadData) {
+/** Guarda el PAAD completo en el esquema del editor SIIGPA (PaadContenido: puntos 1 al 8). */
+export async function guardarBorradorPaad(paadId: string, datos: PaadContenido) {
   await operarPaad(prisma, await actor(), paadId, 'guardar', { datos }); refrescar();
 }
 export async function presentarPaad(paadId: string) {

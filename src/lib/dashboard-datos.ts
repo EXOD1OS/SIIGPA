@@ -11,7 +11,8 @@ const obs = (o: { id: string; resuelto: boolean; rolAutor: UserRole; campoPath: 
   id: o.id,
   resolved: o.resuelto,
   area: AREA[o.rolAutor],
-  campoPath: o.campoPath && o.campoPath !== 'general' ? o.campoPath : undefined,
+  // `campoPath` del editor: "<paac|paad>.<campo>::<sección>" → se muestra solo el campo.
+  campoPath: o.campoPath && o.campoPath !== 'general' ? o.campoPath.split('::')[0].replace(/^(paac|paad)\./, '') : undefined,
   text: o.mensaje,
 });
 

@@ -33,6 +33,20 @@ function valorEscalar(value: string | number | boolean) {
   if (typeof value === 'string' && /^[A-Z0-9_]+$/.test(value)) {
     return value.replaceAll('_', ' ').toLocaleLowerCase('es-AR').replace(/^./, (first) => first.toLocaleUpperCase('es-AR'));
   }
+  // Campos narrativos del editor SIIGPA: HTML enriquecido → texto plano para el PDF.
+  if (typeof value === 'string' && /<\/?[a-z][^>]*>/i.test(value)) {
+    return value
+      .replace(/<\/(p|li|h\d)>|<br\s*\/?>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '• ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/\n{2,}/g, '\n')
+      .trim();
+  }
   return String(value);
 }
 

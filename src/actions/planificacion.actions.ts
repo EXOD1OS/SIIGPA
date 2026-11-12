@@ -10,10 +10,10 @@ import { asegurarPaad } from '@/lib/paad';
 import { planificacionVisiblePara } from '@/lib/visibilidad';
 import { permiteObservaciones, tieneObservacionesPendientes } from '@/lib/observaciones';
 import { consolidarYSubirExpediente } from '@/lib/archivo-expediente';
-import { construirContextoInformes } from '@/lib/informes-servidor';
-import type { PaacData } from '@/types/planificacion';
+import { dictamenesPaac } from '@/types/planificacion';
+import { esPaacPrototipo } from '@/lib/prototipo-adapter';
+import type { PaacContenido } from '@/prototipo/types/paac';
 import type {
-  ContextoInformes,
   InformeDisciplinarDatos,
   InformeDisciplinarGuardado,
   InformePedagogicoDatos,
@@ -50,26 +50,32 @@ function requireEstadoEditable(estado: string, tienePendientes = false) {
   }
 }
 
+/** Prototipo (`finalizarRevision`): el favorable de un área se bloquea solo por SUS observaciones abiertas. */
+function requirePendientesDelArea(planif: { observaciones: readonly { resuelto: boolean; rolAutor: string }[] }, rol: UserRole) {
+  if (planif.observaciones.some((o) => !o.resuelto && o.rolAutor === rol)) {
+    throw new Error('No se puede emitir un dictamen favorable mientras tengas observaciones sin subsanar.');
+  }
+}
+
 function requireSinObservacionesPendientes(planif: { observaciones: readonly { resuelto: boolean }[] }, mensaje: string) {
   if (tieneObservacionesPendientes(planif.observaciones)) throw new Error(mensaje);
 }
 
-export async function actualizarPaac(planifId: string, datosPaac: PaacData) {
+/**
+ * Guarda el PAAC completo en el esquema del editor SIIGPA (PaacContenido): ningún campo ni tabla editable
+ * del prototipo se pierde al recargar. Solo el Docente Responsable (o Administración) en Borrador u Observado.
+ */
+export async function actualizarPaac(planifId: string, datosPaac: PaacContenido) {
   const session = await requireSession();
   const planif = await requirePlanificacionVisible(planifId, session);
 
   const puedeEditar = planif.docenteResponsableId === session.user.id || session.user.rol === UserRole.ADMINISTRADOR;
   if (!puedeEditar) throw new Error('No autorizado.');
-  const tienePendientes = tieneObservacionesPendientes(planif.observaciones);
-  requireEstadoEditable(planif.estado, tienePendientes);
+  requireEstadoEditable(planif.estado);
+  if (!esPaacPrototipo(datosPaac)) throw new Error('El contenido del PAAC no tiene el formato esperado.');
 
-  const updated = await prisma.planificacion.update({
-    where: { id: planifId },
-    data: { datosPaac: datosPaac as any, ...(tienePendientes ? { estado: 'OBSERVADO' } : {}) },
-  });
-
+  await prisma.planificacion.update({ where: { id: planifId }, data: { datosPaac: datosPaac as any } });
   revalidatePlanif(planifId);
-  return updated;
 }
 
 export async function invitarDocenteEquipo(planificacionId: string, docenteId: string, cargoEnCatedra: string) {
@@ -164,13 +170,48 @@ export async function enviarARevision(planifId: string) {
     'No se puede enviar a revisión: primero deben resolverse todas las observaciones pendientes.',
   );
 
+  // Presentación (prototipo `presentarDocumento`): los dictámenes observados vuelven a "En revisión"
+  // y los favorables se conservan, por lo que el estado se recalcula a partir de ellos.
+  const { pedApproved, discApproved } = dictamenesPaac(planif);
+  const reevaluar = (inf: unknown) =>
+    inf && typeof inf === 'object' && (inf as { dictamen?: string }).dictamen === 'REQUIERE_CORRECCION' ? { ...(inf as object), dictamen: 'REEVALUACION' } : undefined;
+  const ped = reevaluar(planif.informePedagogico);
+  const disc = reevaluar(planif.informeDisciplinar);
+  const estado: PlanifStatus = pedApproved && discApproved ? 'APROBADO_PLENO' : pedApproved ? 'APROBADO_PEDAGOGICO' : discApproved ? 'APROBADO_DISCIPLINAR' : 'ENVIADO_A_REVISION';
+
   const updated = await prisma.planificacion.update({
     where: { id: planifId },
-    data: { estado: 'ENVIADO_A_REVISION' },
+    data: { estado, ...(ped ? { informePedagogico: ped as any } : {}), ...(disc ? { informeDisciplinar: disc as any } : {}) },
   });
 
   revalidatePlanif(planifId);
   return updated;
+}
+
+/** Rol de revisión → área del prototipo. */
+const areaDe = (rol: UserRole) => (rol === UserRole.UAP ? 'uap' : rol === UserRole.DIRECCION_CARRERA ? 'direccion' : null);
+
+/**
+ * «Enviar con revisiones» (UAP o Dirección): cierra la revisión del área con observaciones y devuelve el PAAC
+ * al docente (estado OBSERVADO). Requiere observaciones ancladas del área o una observación escrita.
+ */
+export async function observarPaacAction(planifId: string, observaciones: string) {
+  const session = await requireSession();
+  const area = areaDe(session.user.rol);
+  if (!area) throw new Error('No autorizado.');
+  const planif = await requirePlanificacionVisible(planifId, session);
+  if (!ESTADOS_EN_EVALUACION.includes(planif.estado)) throw new Error('El estado actual no permite observar esta planificación.');
+  const { pedApproved, discApproved } = dictamenesPaac(planif);
+  if ((area === 'uap' && pedApproved) || (area === 'direccion' && discApproved)) throw new Error('Tu área ya emitió dictamen favorable.');
+  const pendientes = planif.observaciones.filter((o) => !o.resuelto && o.rolAutor === session.user.rol).length;
+  if (pendientes === 0 && !observaciones.trim()) throw new Error('Anclá al menos una observación o escribí el motivo antes de devolver el PAAC.');
+
+  const informe = { modelo: 'ORD_219_2022', dictamen: 'REQUIERE_CORRECCION', observaciones: observaciones.trim(), firmante: session.user.name ?? '', fecha: fechaInforme() };
+  await prisma.planificacion.update({
+    where: { id: planifId },
+    data: { estado: 'OBSERVADO', ...(area === 'uap' ? { informePedagogico: informe } : { informeDisciplinar: informe }) },
+  });
+  revalidatePlanif(planifId);
 }
 
 export async function agregarObservacion(input: {
@@ -204,14 +245,8 @@ export async function agregarObservacion(input: {
       },
     });
 
-    // Una observación abre formalmente el ciclo de corrección. Sin esta
-    // transición el docente podía leer el comentario, pero los formularios
-    // seguían bloqueados por conservar el estado de revisión anterior.
-    await tx.planificacion.update({
-      where: { id: input.planificacionId },
-      data: { estado: 'OBSERVADO' },
-    });
-
+    // Flujo del prototipo: las observaciones ancladas se acumulan durante la revisión; el PAAC vuelve al
+    // docente recién con «Enviar con revisiones» (observarPaacAction).
     return creada;
   });
 
@@ -239,24 +274,6 @@ export async function resolverObservacion(observacionId: string) {
   return updated;
 }
 
-export async function marcarComoObservado(planifId: string) {
-  const session = await requireSession();
-  if (!hasRole(session.user.rol, [UserRole.UAP, UserRole.DIRECCION_CARRERA])) throw new Error('No autorizado.');
-
-  const planif = await requirePlanificacionVisible(planifId, session);
-  if (!['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR'].includes(planif.estado)) {
-    throw new Error('El estado actual no permite observar esta planificación.');
-  }
-
-  const updated = await prisma.planificacion.update({
-    where: { id: planifId },
-    data: { estado: 'OBSERVADO' },
-  });
-
-  revalidatePlanif(planifId);
-  return updated;
-}
-
 const ESTADOS_EN_EVALUACION = ['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR'];
 const fechaInforme = () => new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -272,7 +289,7 @@ export async function registrarAprobacionPedagogica(planifId: string, input: { p
   if (!ESTADOS_EN_EVALUACION.includes(planif.estado) || planif.estado === 'APROBADO_PEDAGOGICO') {
     throw new Error('El estado actual no permite emitir el Informe Pedagógico.');
   }
-  requireSinObservacionesPendientes(planif, 'No se puede emitir el informe favorable mientras existan observaciones pendientes.');
+  requirePendientesDelArea(planif, UserRole.UAP);
 
   const informe: InformePedagogicoGuardado = {
     modelo: 'ORD_219_2022',
@@ -304,7 +321,7 @@ export async function registrarAprobacionDisciplinar(planifId: string, input: { 
   if (!ESTADOS_EN_EVALUACION.includes(planif.estado) || planif.estado === 'APROBADO_DISCIPLINAR') {
     throw new Error('El estado actual no permite emitir el Informe Disciplinar.');
   }
-  requireSinObservacionesPendientes(planif, 'No se puede emitir el informe favorable mientras existan observaciones pendientes.');
+  requirePendientesDelArea(planif, UserRole.DIRECCION_CARRERA);
 
   const informe: InformeDisciplinarGuardado = {
     modelo: 'ORD_219_2022',
@@ -322,13 +339,6 @@ export async function registrarAprobacionDisciplinar(planifId: string, input: { 
 
   revalidatePlanif(planifId);
   return updated;
-}
-
-/** Informes de un PAAC en solo lectura (modal de la bandeja). Respeta la visibilidad del rol. */
-export async function obtenerInformesAction(planifId: string): Promise<ContextoInformes> {
-  const session = await requireSession();
-  const planif = await requirePlanificacionVisible(planifId, session);
-  return construirContextoInformes(planif);
 }
 
 /**

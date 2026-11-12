@@ -1,7 +1,8 @@
 import { PaadStatus, Prisma, PrismaClient, UserRole } from '@prisma/client';
 import { z } from 'zod';
-import { defaultPaad } from './defaults';
+import { paadVacio } from '@/prototipo/types/paad';
 import type { PaadData } from '@/types/planificacion';
+import type { PaadContenido } from '@/prototipo/types/paad';
 
 export type PaadActor = { id: string; rol: UserRole; carreraId: string | null };
 export type PaadTx = Prisma.TransactionClient;
@@ -13,7 +14,7 @@ export const PAAD_REVISABLES: PaadStatus[] = ['ENVIADO_A_REVISION', 'APROBADO_UA
 
 // Valida la estructura del formulario sin inventar campos obligatorios.
 const text = z.string();
-const paadSchema = z.object({
+const paadSchemaAnterior = z.object({
   actividadEnsenanza: z.object({
     cursosAtendidos: z.array(text),
     capacitaciones: z.array(z.object({ lugar: text, fecha: text, tematica: text, areaConocimiento: text, nombreCapacitacion: text })),
@@ -29,6 +30,21 @@ const paadSchema = z.object({
     lunes: text.optional(), martes: text.optional(), miercoles: text.optional(), jueves: text.optional(), viernes: text.optional(), sabado: text.optional(),
   })),
 });
+
+// Esquema del editor SIIGPA (PaadContenido de `_prototipo`): listas de ítems de los apartados 1) a 7) y
+// matriz de horas del punto 8) Distribución Horaria.
+const dias = z.object({ lunes: text, martes: text, miercoles: text, jueves: text, viernes: text, sabado: text });
+const paadSchemaPrototipo = z.object({
+  listas: z.object({
+    cursos: z.array(text), capacitaciones: z.array(text), materiales: z.array(text), otrosDocentes: z.array(text),
+    investigacion: z.array(text), recursosHumanos: z.array(text), formacionAcademica: z.array(text),
+    extension: z.array(text), gestion: z.array(text), otras: z.array(text),
+  }),
+  horas: z.object({ ensenanza: dias, investigacion: dias, extension: dias, formacion: dias, gestion: dias }),
+});
+/** Acepta el esquema del editor actual y el anterior (los PAAD previos se convierten al abrirlos). */
+const paadSchema = z.union([paadSchemaPrototipo, paadSchemaAnterior]);
+export type DatosPaadGuardables = z.infer<typeof paadSchema>;
 
 export async function carrerasPaad(tx: PaadTx, docenteId: string, cicloLectivo: number) {
   const include = { planEstudio: { select: { carreraId: true } } } as const;
@@ -47,7 +63,7 @@ export async function asegurarPaad(tx: PaadTx, docenteId: string, cicloLectivo: 
   const carreras = await carrerasPaad(tx, docenteId, cicloLectivo);
   const anual = await tx.paadAnual.upsert({
     where: { docenteId_cicloLectivo: { docenteId, cicloLectivo } }, update: {},
-    create: { docenteId, cicloLectivo, datosPaad: defaultPaad() as unknown as Prisma.InputJsonValue,
+    create: { docenteId, cicloLectivo, datosPaad: paadVacio() as unknown as Prisma.InputJsonValue,
       carreraEvaluadoraId: carreras.length === 1 ? carreras[0] : null },
   });
   if (!anual.direccionManual && anual.estado === 'BORRADOR' &&
@@ -96,7 +112,7 @@ function revisor(actor: PaadActor, paad: { carreraEvaluadoraId: string | null })
 
 export async function operarPaad(db: PrismaClient, actor: PaadActor, id: string,
   operacion: 'guardar' | 'presentar' | 'observar' | 'dictaminar' | 'direccion',
-  input: { datos?: PaadData; presentacionId?: string; campoPath?: string; mensaje?: string; resultado?: 'FAVORABLE' | 'REQUIERE_CORRECCION'; carreraId?: string }) {
+  input: { datos?: PaadContenido | PaadData; presentacionId?: string; campoPath?: string; mensaje?: string; resultado?: 'FAVORABLE' | 'REQUIERE_CORRECCION'; carreraId?: string }) {
   return db.$transaction(async tx => {
     // Parámetros separados del SQL: serializa cambios para conservar dictámenes concurrentes.
     await tx.$queryRawUnsafe('SELECT id FROM "PaadAnual" WHERE id = $1 FOR UPDATE', id);
@@ -135,18 +151,24 @@ export async function operarPaad(db: PrismaClient, actor: PaadActor, id: string,
     const revision = p.presentaciones[0];
     if (!revision || input.presentacionId !== revision.id) throw new Error('La presentación cambió. Actualizá la página antes de revisar.');
     const mensaje = input.mensaje?.trim() ?? '';
-    if (operacion === 'observar' || input.resultado === 'REQUIERE_CORRECCION') {
+    // Observación anclada a un campo (flujo del prototipo): se acumula durante la revisión sin cambiar el estado.
+    if (operacion === 'observar') {
       if (!mensaje) throw new Error('Escribí la corrección requerida.');
-      if (operacion === 'dictaminar') {
-        if (revision.dictamenes.some(d => d.rolAutor === actor.rol)) throw new Error('Esta instancia ya registró su dictamen para la presentación.');
-        await tx.dictamenPaad.create({ data: { presentacionId: revision.id, autorId: actor.id, rolAutor: actor.rol,
-          resultado: 'REQUIERE_CORRECCION', comentario: mensaje } });
-      }
-      await tx.observacionPaad.create({ data: { paadId: id, presentacionId: revision.id, autorId: actor.id,
+      return tx.observacionPaad.create({ data: { paadId: id, presentacionId: revision.id, autorId: actor.id,
+        rolAutor: actor.rol, campoPath: input.campoPath || 'general', mensaje } });
+    }
+    // «Enviar con revisiones (Observado)»: devuelve el PAAD al docente con las observaciones ancladas.
+    if (input.resultado === 'REQUIERE_CORRECCION') {
+      const abiertas = p.observaciones.some(o => !o.resuelto);
+      if (!mensaje && !abiertas) throw new Error('Para enviar con revisiones, anclá al menos una observación en los apartados del PAAD.');
+      if (revision.dictamenes.some(d => d.rolAutor === actor.rol)) throw new Error('Esta instancia ya registró su dictamen para la presentación.');
+      await tx.dictamenPaad.create({ data: { presentacionId: revision.id, autorId: actor.id, rolAutor: actor.rol,
+        resultado: 'REQUIERE_CORRECCION', comentario: mensaje || 'Ver observaciones ancladas en los apartados.' } });
+      if (mensaje) await tx.observacionPaad.create({ data: { paadId: id, presentacionId: revision.id, autorId: actor.id,
         rolAutor: actor.rol, campoPath: input.campoPath || 'general', mensaje } });
       return tx.paadAnual.update({ where: { id }, data: { estado: 'OBSERVADO' } });
     }
-    if (input.resultado !== 'FAVORABLE') throw new Error('Dictamen inválido.');
+    if (operacion !== 'dictaminar' || input.resultado !== 'FAVORABLE') throw new Error('Dictamen inválido.');
     if (p.observaciones.some(o => !o.resuelto)) throw new Error('No se puede aprobar con observaciones pendientes.');
     const anterior = revision.dictamenes.find(d => d.rolAutor === actor.rol);
     if (anterior) {

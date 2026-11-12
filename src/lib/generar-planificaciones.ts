@@ -1,7 +1,6 @@
 import { Prisma, PrismaClient } from '@prisma/client';
-import { defaultPaacCompetencias, defaultPaacTraditional } from './defaults';
+import { paacVacio } from '@/prototipo/types/paac';
 import { asegurarPaad } from './paad';
-import type { DocentCategory, PaacCompetenciasData, PaacTraditionalData } from '@/types/planificacion';
 
 export async function generarPlanificacionesDelCiclo(prisma: PrismaClient, cicloLectivo: number) {
   if (!Number.isInteger(cicloLectivo) || cicloLectivo < 2000 || cicloLectivo > 2100) {
@@ -49,33 +48,8 @@ export async function generarPlanificacionesDelCiclo(prisma: PrismaClient, ciclo
     const responsable = responsableDesignado ?? equipo[0];
     const plan = asignatura.planEstudio;
     const carrera = plan.carrera;
-    const regimen = asignatura.regimen as PaacCompetenciasData['encabezado']['regimen'];
-    const datosPaac = plan.enfoque === 'COMPETENCIAS'
-      ? defaultPaacCompetencias({
-          sede: carrera.sede.nombre,
-          carrera: carrera.nombre,
-          planEstudio: plan.ordenanza,
-          curso: asignatura.anoCursada ? `${asignatura.anoCursada}° año` : 'A DEFINIR',
-          asignatura: asignatura.nombre,
-          regimen,
-          creditoHorario: asignatura.creditoHorario,
-          horasTeoricas: 0,
-          horasPracticas: 0,
-          equipoCatedra: equipo.map((integrante) => ({
-            cargo: integrante.categoria as DocentCategory,
-            nombre: `${integrante.docente.nombre} ${integrante.docente.apellido}`,
-          })),
-          contenidosMinimos: asignatura.contenidosMinimosOficiales,
-          nivelIntensidad: 0,
-          relacionTeoricoPractica: '',
-        })
-      : defaultPaacTraditional({
-          carrera: carrera.nombre,
-          planEstudio: plan.ordenanza,
-          asignatura: asignatura.nombre,
-          curso: asignatura.anoCursada,
-          regimen: regimen as PaacTraditionalData['encabezado']['regimen'],
-        });
+    // PAAC en el esquema del editor SIIGPA (_prototipo): el encabezado se proyecta desde la asignatura.
+    const datosPaac = paacVacio();
 
     const creado = await prisma.$transaction(async (tx) => {
       if (copiarEquipo) {

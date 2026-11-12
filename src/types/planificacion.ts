@@ -273,8 +273,9 @@ export function dictamenesPaac(p: {
   observacionesAbiertas?: { rolAutor: string }[];
 }) {
   const dictamen = (v: unknown) => (v && typeof v === 'object' ? (v as { dictamen?: string }).dictamen : undefined);
-  const pedApproved = ESTADOS_CON_PED.includes(p.estado);
-  const discApproved = ESTADOS_CON_DISC.includes(p.estado);
+  // Prototipo: el dictamen favorable de un área se conserva aunque la otra devuelva el PAAC con observaciones.
+  const pedApproved = ESTADOS_CON_PED.includes(p.estado) || (p.estado !== 'BORRADOR' && dictamen(p.informePedagogico) === 'FAVORABLE');
+  const discApproved = ESTADOS_CON_DISC.includes(p.estado) || (p.estado !== 'BORRADOR' && dictamen(p.informeDisciplinar) === 'CUMPLE');
   const abiertas = p.observacionesAbiertas ?? [];
   const pedObservado = !pedApproved && (dictamen(p.informePedagogico) === 'REQUIERE_CORRECCION' || abiertas.some((o) => o.rolAutor === 'UAP'));
   const discObservado =
