@@ -118,17 +118,6 @@ export function DocenteDashboardView({ datos, nav, onVerMiPaad }: { datos: Datos
             Ciclo Lectivo {ciclo} · {total} {total === 1 ? 'cátedra asignada' : 'cátedras asignadas'} ({respCount} como responsable · {intCount} como integrante)
           </p>
         </div>
-        {alertas.length > 0 && (
-          <button
-            type="button"
-            onClick={alertas[0].abrir}
-            className="inline-flex items-center gap-2 self-start rounded-full border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-500/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 dark:text-amber-200 sm:self-auto"
-          >
-            <IconAlert className="h-4 w-4" />
-            Tenés {alertas.length} observación(es) pendiente(s) de subsanar
-            <IconArrowRight className="h-3.5 w-3.5" />
-          </button>
-        )}
       </header>
 
       {/* Grilla superior: Mi PAAD Anual + Estado de mis PAAC (misma altura, pies alineados) */}
@@ -300,7 +289,7 @@ export function DocenteDashboardView({ datos, nav, onVerMiPaad }: { datos: Datos
                     <StatusBadge estado={d.state} />
                     {pendientes > 0 && (
                       <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                        {pendientes} obs. pendiente(s)
+                        Observaciones: {pendientes}
                       </span>
                     )}
                   </div>

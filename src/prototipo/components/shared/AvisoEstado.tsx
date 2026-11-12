@@ -75,16 +75,16 @@ export function AvisoEstado({
 }) {
   const t = TONOS[tono];
   return (
-    <div role={t.rol} className={`flex flex-col items-center justify-center gap-3 rounded-2xl border-2 px-6 py-4 text-center shadow-sm sm:flex-row ${t.caja}`}>
+    <div role={t.rol} className={`flex w-full flex-wrap items-center justify-start gap-3.5 rounded-2xl border px-5 py-3.5 text-left shadow-sm sm:flex-nowrap ${t.caja}`}>
       <IconoEstado tono={tono} />
-      <div className="min-w-0 sm:text-left">
-        <p className="flex flex-wrap items-center justify-center gap-2 text-sm font-bold tracking-tight text-ink sm:justify-start sm:text-base">
+      <div className="min-w-0 flex-1 text-left">
+        <p className="flex flex-wrap items-center gap-2 text-sm font-bold tracking-tight text-ink">
           {etiqueta && (
             <span className={`rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${t.icono}`}>{etiqueta}</span>
           )}
           {titulo}
         </p>
-        {children && <div className="mt-0.5 text-xs font-medium leading-relaxed text-muted">{children}</div>}
+        {children && <div className="mt-0.5 text-xs leading-relaxed text-muted">{children}</div>}
       </div>
       {accion && <div className="shrink-0">{accion}</div>}
     </div>

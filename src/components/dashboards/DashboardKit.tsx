@@ -609,7 +609,7 @@ export function SelectableCatedraCard({ c, onOpen }: { c: CatedraTarjeta; onOpen
           <StatusBadge estado={c.state} />
           {c.pendientes > 0 && (
             <span className="rounded-full border border-amber-500/30 bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-              {c.pendientes} obs. pendiente(s)
+              Observaciones: {c.pendientes}
             </span>
           )}
         </div>

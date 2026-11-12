@@ -18,7 +18,7 @@ interface Props {
   state: string;
   /**
    * Observaciones sin subsanar. Si se pasa y el documento está Observado,
-   * debajo del estado se muestra el indicador "Observaciones pendientes".
+   * debajo del estado se muestra el indicador "Observaciones: N".
    */
   pendientes?: number;
 }
@@ -38,7 +38,7 @@ export function StatusBadge({ state, pendientes }: Props) {
       {badge}
       <span className="inline-flex items-center gap-1 whitespace-nowrap text-[10px] font-semibold text-amber-700 dark:text-amber-400">
         <IconAlert className="h-3 w-3" />
-        Observaciones pendientes: <span className="tabular-nums">{pendientes}</span>
+        Observaciones: <span className="tabular-nums">{pendientes}</span>
       </span>
     </span>
   );

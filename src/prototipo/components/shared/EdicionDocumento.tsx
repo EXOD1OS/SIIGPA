@@ -18,12 +18,12 @@ export function BadgeObservaciones({ pendientes, total }: { pendientes: number; 
   }
   return (
     <span
-      title={`${pendientes} observación(es) pendiente(s)`}
+      title={`Observaciones: ${pendientes}`}
       className="flex h-5 items-center gap-0.5 rounded-md border border-amber-500/20 bg-amber-500/15 px-1 text-[10px] font-bold tabular-nums text-amber-700 dark:text-amber-400"
     >
       <IconAlert className="h-3 w-3" />
+      <span className="sr-only">Observaciones: </span>
       {pendientes}
-      <span className="sr-only"> observación(es) pendiente(s)</span>
     </span>
   );
 }

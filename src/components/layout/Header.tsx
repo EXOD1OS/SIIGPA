@@ -11,7 +11,10 @@ import { useTheme } from '@/components/theme/ThemeProvider';
 import { IconAlert, IconBell, IconCheck, IconChevronDown, IconChevronRight, IconClock, IconKey, IconLogout, IconMoon, IconSun } from './icons';
 
 export interface NotificationItem {
+  /** Identificador estable que cambia con el estado del documento (vuelve a figurar como no leída). */
   id: string;
+  /** warning: requiere corrección · revision: tarea pendiente · info: recordatorio · success: aprobación. */
+  tipo: 'warning' | 'revision' | 'info' | 'success';
   /** Ruta a la que lleva la notificación (ej. `/planificaciones/<id>`). */
   href: string;
   title: string;
@@ -21,6 +24,8 @@ export interface NotificationItem {
 }
 
 interface Props {
+  /** Id del usuario: las notificaciones leídas se recuerdan por usuario en este navegador. */
+  uid: string;
   nombre: string;
   rol: string;
   /** La cuenta usa una contraseña provisoria: el modal se abre solo y no se puede cerrar. */
@@ -28,19 +33,40 @@ interface Props {
   notifications?: NotificationItem[];
 }
 
-type Tono = 'atencion' | 'revision' | 'ok';
-
-const tonoDe = (n: NotificationItem): Tono => {
-  if (n.unresolvedCount > 0 || n.state === 'OBSERVADO') return 'atencion';
-  if (['ENVIADO_A_REVISION', 'APROBADO_PEDAGOGICO', 'APROBADO_DISCIPLINAR', 'ELEVADO_AL_CONSEJO'].includes(n.state)) return 'revision';
-  return 'ok';
-};
-
-const TONO: Record<Tono, { Icon: typeof IconAlert; cls: string }> = {
-  atencion: { Icon: IconAlert, cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
+const TONO: Record<NotificationItem['tipo'], { Icon: typeof IconAlert; cls: string }> = {
+  warning: { Icon: IconAlert, cls: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
   revision: { Icon: IconClock, cls: 'bg-sky-500/15 text-sky-600 dark:text-sky-400' },
-  ok: { Icon: IconCheck, cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
+  info: { Icon: IconBell, cls: 'bg-soft text-primary' },
+  success: { Icon: IconCheck, cls: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
 };
+
+const claveLeidas = (uid: string) => `siigpa.notif.leidas.${uid}`;
+
+/** Ids leídos guardados en el navegador (si el almacenamiento no está disponible, solo dura la sesión). */
+function useLeidas(uid: string, vigentes: string[]) {
+  const [leidas, setLeidas] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const guardadas = JSON.parse(localStorage.getItem(claveLeidas(uid)) ?? '[]');
+      if (Array.isArray(guardadas)) setLeidas(new Set(guardadas.filter((x): x is string => typeof x === 'string')));
+    } catch {
+      /* almacenamiento no disponible */
+    }
+  }, [uid]);
+  const marcar = (ids: string[]) =>
+    setLeidas((prev) => {
+      const next = new Set([...prev, ...ids]);
+      // Solo se conservan las vigentes: las de documentos que cambiaron se descartan.
+      const conservar = [...next].filter((id) => vigentes.includes(id));
+      try {
+        localStorage.setItem(claveLeidas(uid), JSON.stringify(conservar));
+      } catch {
+        /* almacenamiento no disponible */
+      }
+      return new Set(conservar);
+    });
+  return { leidas, marcar };
+}
 
 /** Clases de un panel desplegable con entrada/salida suave. */
 const panelCls = (open: boolean) =>
@@ -55,12 +81,12 @@ function GrupoNotif({ titulo, children }: { titulo: string; children: ReactNode 
   return (
     <div>
       <div className="sticky top-0 z-10 bg-surface px-4 pb-1.5 pt-3 text-[10px] font-bold uppercase tracking-wider text-muted backdrop-blur">{titulo}</div>
-      <ul className="px-2 pb-2">{children}</ul>
+      <ul className="space-y-2 px-3 pb-3">{children}</ul>
     </div>
   );
 }
 
-export function Header({ nombre, rol, mustChangePassword, notifications = [] }: Props) {
+export function Header({ uid, nombre, rol, mustChangePassword, notifications = [] }: Props) {
   const router = useRouter();
   const { update } = useSession();
   const { isDark, toggleTheme } = useTheme();
@@ -88,8 +114,11 @@ export function Header({ nombre, rol, mustChangePassword, notifications = [] }: 
     .join('')
     .toUpperCase();
 
-  const atencion = notifications.filter((n) => tonoDe(n) === 'atencion');
-  const resto = notifications.filter((n) => tonoDe(n) !== 'atencion');
+  const { leidas, marcar } = useLeidas(uid, notifications.map((n) => n.id));
+  const noLeidas = notifications.filter((n) => !leidas.has(n.id));
+  const unreadCount = noLeidas.length;
+  const atencion = notifications.filter((n) => n.tipo === 'warning' || n.tipo === 'revision');
+  const resto = notifications.filter((n) => n.tipo !== 'warning' && n.tipo !== 'revision');
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
@@ -119,31 +148,45 @@ export function Header({ nombre, rol, mustChangePassword, notifications = [] }: 
   };
 
   const renderNotif = (n: NotificationItem) => {
-    const { Icon, cls } = TONO[tonoDe(n)];
+    const { Icon, cls } = TONO[n.tipo];
+    const leida = leidas.has(n.id);
     return (
       <li key={n.id}>
         <button
           type="button"
           onClick={() => {
+            marcar([n.id]);
             setNotifOpen(false);
             router.push(n.href);
           }}
-          className="group flex w-full items-start gap-3 rounded-xl p-2.5 text-left transition-colors duration-150 hover:bg-background focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+          aria-label={`${leida ? '' : 'No leída: '}${n.title}. ${n.subtitle}${n.unresolvedCount > 0 ? `. Observaciones: ${n.unresolvedCount}` : ''}`}
+          className={`group relative flex w-full cursor-pointer items-start gap-3 rounded-xl border p-3.5 text-left transition-all duration-150 hover:border-[color:color-mix(in_srgb,var(--primary)_40%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--soft)_50%,transparent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary ${
+            leida
+              ? 'border-[color:color-mix(in_srgb,var(--border)_80%,transparent)] bg-[color:color-mix(in_srgb,var(--bg)_60%,transparent)]'
+              : 'border-[color:color-mix(in_srgb,var(--primary)_25%,transparent)] bg-[color:color-mix(in_srgb,var(--primary)_5%,transparent)]'
+          }`}
         >
-          <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cls}`}>
+          {/* Ícono (columna izquierda) */}
+          <span aria-hidden className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cls}`}>
             <Icon className="h-4 w-4" />
           </span>
           <span className="min-w-0 flex-1">
+            {/* Fila 1: instrumento + estado (y punto de no leída) */}
             <span className="flex items-start justify-between gap-2">
-              <span className="truncate text-xs font-semibold text-ink">{n.title}</span>
-              <StatusBadge estado={n.state} />
+              <span className={`line-clamp-2 text-xs font-bold leading-snug ${leida ? 'text-muted' : 'text-ink'}`}>{n.title}</span>
+              <span className="flex shrink-0 items-center gap-1.5">
+                <StatusBadge estado={n.state} />
+                {!leida && <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
+              </span>
             </span>
-            <span className="mt-0.5 block truncate text-[11px] text-muted">{n.subtitle}</span>
-            {n.unresolvedCount > 0 && (
-              <span className="mt-1 block text-[11px] font-medium text-amber-700 dark:text-amber-400">{n.unresolvedCount} observación(es) por subsanar</span>
-            )}
+            {/* Fila 2: metadatos + observaciones */}
+            <span className="mt-1.5 flex items-center justify-between gap-2">
+              <span className="min-w-0 truncate text-[11px] text-muted" title={n.subtitle}>{n.subtitle}</span>
+              {n.unresolvedCount > 0 && (
+                <span className="shrink-0 text-[11px] font-semibold tabular-nums text-amber-600 dark:text-amber-500">Observaciones: {n.unresolvedCount}</span>
+              )}
+            </span>
           </span>
-          <IconChevronRight className="mt-2 h-3.5 w-3.5 shrink-0 text-muted opacity-0 transition-all duration-150 group-hover:translate-x-0.5 group-hover:opacity-100" />
         </button>
       </li>
     );
@@ -186,21 +229,19 @@ export function Header({ nombre, rol, mustChangePassword, notifications = [] }: 
                 setNotifOpen((o) => !o);
                 setMenuOpen(false);
               }}
-              aria-label={`Notificaciones${atencion.length ? `: ${atencion.length} requieren atención` : ''}`}
+              aria-label={`Notificaciones${unreadCount ? `: ${unreadCount} sin leer` : ''}`}
               aria-expanded={notifOpen}
               aria-haspopup="dialog"
               className={`${iconBtnCls} ${notifOpen ? 'border-primary bg-soft text-primary' : ''}`}
             >
               <IconBell className={`h-[18px] w-[18px] transition-transform duration-300 ${notifOpen ? 'rotate-12' : ''}`} />
-              {atencion.length > 0 ? (
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-danger opacity-40 motion-reduce:animate-none" />
-                  <span className="relative flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white ring-2 ring-surface">
-                    {atencion.length}
+              {unreadCount > 0 && (
+                <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-500 opacity-40 motion-reduce:animate-none" />
+                  <span className="relative flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold tabular-nums text-white ring-2 ring-surface">
+                    {unreadCount > 99 ? '99+' : unreadCount}
                   </span>
                 </span>
-              ) : (
-                notifications.length > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary ring-2 ring-surface" />
               )}
             </button>
 
@@ -209,14 +250,29 @@ export function Header({ nombre, rol, mustChangePassword, notifications = [] }: 
               aria-label="Notificaciones"
               aria-hidden={!notifOpen}
               ref={notifPanelRef}
-              className={`${panelCls(notifOpen)} w-[22rem] max-w-[calc(100vw-2rem)] overflow-hidden`}
+              className={`${panelCls(notifOpen)} w-80 max-w-[calc(100vw-2rem)] overflow-hidden sm:w-96`}
             >
-              <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                <div>
-                  <div className="text-sm font-bold text-ink">Notificaciones</div>
-                  <div className="text-[11px] text-muted">{atencion.length ? `${atencion.length} requieren tu atención` : 'Todo al día'}</div>
+              <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-sm font-bold text-ink">
+                    Notificaciones
+                    {unreadCount > 0 && (
+                      <span className="rounded-full bg-rose-500 px-1.5 py-px text-[10px] font-bold tabular-nums text-white">{unreadCount}</span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-muted">
+                    {unreadCount ? `${unreadCount} sin leer` : notifications.length ? 'Todas leídas' : 'Todo al día'}
+                    {atencion.length > 0 && ` · ${atencion.length} requieren tu atención`}
+                  </div>
                 </div>
-                <span className="rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold tabular-nums text-muted">{notifications.length}</span>
+                <button
+                  type="button"
+                  onClick={() => marcar(notifications.map((n) => n.id))}
+                  disabled={unreadCount === 0}
+                  className="shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-soft disabled:pointer-events-none disabled:opacity-40"
+                >
+                  Marcar todas como leídas
+                </button>
               </div>
 
               <div className="max-h-[22rem] overflow-y-auto">

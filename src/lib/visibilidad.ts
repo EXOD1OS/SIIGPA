@@ -24,7 +24,7 @@ function carreraEvaluadoraWhere(carreraId: string): Prisma.PlanificacionWhereInp
   };
 }
 
-function planificacionesWherePara(user: SessionUser): Prisma.PlanificacionWhereInput {
+export function planificacionesWherePara(user: SessionUser): Prisma.PlanificacionWhereInput {
   switch (user.rol) {
     case UserRole.ADMINISTRADOR:
     case UserRole.UAP:
