@@ -146,11 +146,12 @@ export function PaadsListView({
           <table className="w-full table-fixed min-w-[900px] text-left border-collapse text-xs">
             <thead>
               <tr className="bg-background text-muted border-b border-border text-[11px]">
-                <th scope="col" className="w-[22%] p-4">Docente</th>
-                <th scope="col" className="w-[32%] p-4">Cátedras en el Ciclo</th>
+                {/* 24 + 30 + 18 + 16 + 12 = 100 % */}
+                <th scope="col" className="w-[24%] p-4">Docente</th>
+                <th scope="col" className="w-[30%] p-4">Cátedras en el Ciclo</th>
                 <th scope="col" className="w-[18%] p-4">Dirección Evaluadora</th>
                 <th scope="col" className="w-[16%] p-4">Estado PAAD</th>
-                <th scope="col" className="w-[12%] p-4 text-right">Acciones</th>
+                <th scope="col" className="w-[12%] p-4 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -194,7 +195,7 @@ export function PaadsListView({
                       <td className="p-4">
                         <StatusBadge state={d.state} pendientes={pendientesDe(d)} />
                       </td>
-                      <td className="p-4 text-right">
+                      <td className="p-4 text-center">
                         <button
                           type="button"
                           onClick={() => onOpenPaadDoc(d.id, filterCareer !== 'ALL' ? filterCareer : undefined)}

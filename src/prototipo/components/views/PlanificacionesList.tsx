@@ -400,15 +400,16 @@ export function PlanificacionesList({
           <table className="w-full table-fixed min-w-[1360px] text-left border-collapse text-xs">
             <thead>
               <tr className="bg-background text-muted border-b border-border">
-                <th scope="col" className={`${thCls} w-[14%] pl-4 sm:pl-5`}>Asignatura</th>
-                <th scope="col" className={`${thCls} w-[5%]`}>Carrera</th>
-                <th scope="col" className={`${thCls} w-[5%]`}>Ciclo</th>
-                <th scope="col" className={`${thCls} w-[11%]`}>Responsable</th>
-                <th scope="col" className={`${thCls} w-[11%]`}>PAAC</th>
-                <th scope="col" className={`${thCls} w-[11%]`}>Estado</th>
-                <th scope="col" className={`${thCls} w-[12%]`}>Dictámenes</th>
-                <th scope="col" className={`${thCls} w-[10%]`}>Expediente / Resolución</th>
-                <th scope="col" className={`${thCls} w-[21%] pr-4 text-right sm:pr-5`}>Acciones</th>
+                {/* 20 + 7 + 6 + 16 + 11 + 11 + 11 + 9 + 9 = 100 % */}
+                <th scope="col" className={`${thCls} w-[20%] px-4 sm:pl-5`}>Asignatura</th>
+                <th scope="col" className={`${thCls} w-[7%] text-center`}>Carrera</th>
+                <th scope="col" className={`${thCls} w-[6%] text-center`}>Ciclo</th>
+                <th scope="col" className={`${thCls} w-[16%] px-4`}>Responsable</th>
+                <th scope="col" className={`${thCls} w-[11%] px-4`}>PAAC</th>
+                <th scope="col" className={`${thCls} w-[11%] px-4`}>Estado</th>
+                <th scope="col" className={`${thCls} w-[11%] px-4`}>Dictámenes</th>
+                <th scope="col" className={`${thCls} w-[9%] px-4`}>Expediente / Resolución</th>
+                <th scope="col" className={`${thCls} w-[9%] text-center`}>Informes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -417,13 +418,13 @@ export function PlanificacionesList({
                 const obs = d.comments.filter((c) => !c.resolved).length;
                 return (
                   <tr key={d.id} className="transition-colors hover:bg-background">
-                    <td className="min-w-0 px-3 py-3 pl-4 sm:pl-5">
-                      <span className="block truncate font-semibold text-ink" title={ctx.asig?.nombre}>
+                    <td className="min-w-0 px-4 py-3.5 align-middle sm:pl-5">
+                      <span className="line-clamp-2 font-semibold leading-snug text-ink" title={ctx.asig?.nombre}>
                         {ctx.asig?.nombre ?? d.asignaturaId}
                       </span>
-                      <span className="block truncate text-[11px] font-mono text-muted">{ctx.asig?.codigo}</span>
+                      {ctx.asig?.codigo && <span className="block truncate text-[11px] font-mono text-muted">{ctx.asig.codigo}</span>}
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3.5 text-center align-middle">
                       <span
                         title={ctx.carrera?.nombre}
                         className="inline-block cursor-help rounded border border-border bg-background px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-ink"
@@ -432,13 +433,13 @@ export function PlanificacionesList({
                       </span>
                       <span className="sr-only"> ({ctx.carrera?.nombre})</span>
                     </td>
-                    <td className="px-3 py-3 tabular-nums text-ink">{d.cycle}</td>
-                    <td className="min-w-0 px-3 py-3 text-ink">
-                      <span className="block truncate" title={fullName(d.owner)}>
+                    <td className="px-3 py-3.5 text-center align-middle tabular-nums text-ink">{d.cycle}</td>
+                    <td className="min-w-0 px-4 py-3.5 align-middle text-ink">
+                      <span className="line-clamp-2 leading-snug" title={fullName(d.owner)}>
                         {fullName(d.owner)}
                       </span>
                     </td>
-                    <td className="min-w-0 px-3 py-3">
+                    <td className="min-w-0 px-4 py-3.5 align-middle">
                       <PaacCelda
                         doc={d}
                         editable={puedeEditar(d)}
@@ -446,17 +447,16 @@ export function PlanificacionesList({
                         onOpen={() => onOpenDoc(d.id)}
                       />
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3.5 align-middle">
                       <StatusBadge state={d.state} pendientes={obs} />
-
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3.5 align-middle">
                       <div className="flex flex-col items-start gap-1">
                         <DictamenChip area="Disc." value={dictamenDe(d.discApproved, d.discReport)} />
                         <DictamenChip area="Ped." value={dictamenDe(d.pedApproved, d.pedReport)} />
                       </div>
                     </td>
-                    <td className="min-w-0 px-3 py-3 align-middle">
+                    <td className="min-w-0 px-4 py-3.5 align-middle">
                       {d.expediente ? (
                         <div className="min-w-0 space-y-0.5">
                           <span className="block truncate font-mono text-xs font-semibold text-ink" title={d.expediente}>
@@ -475,8 +475,9 @@ export function PlanificacionesList({
                         <span className="text-muted">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 pr-4 align-middle sm:pr-5">
-                      <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                    <td className="px-3 py-3.5 text-center align-middle sm:pr-4">
+                      {/* Con varios botones (Consejo: protocolo + Ver PAAC + Informes) se apilan centrados dentro del 9 %. */}
+                      <div className="flex flex-wrap items-center justify-center gap-2 whitespace-nowrap">
                         {(() => {
                           const etapa = onProtocolizar ? etapaProtocolo(d.state) : null;
                           return etapa ? <BotonProtocolo etapa={etapa} onClick={() => onProtocolizar?.(d.id)} /> : null;

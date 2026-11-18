@@ -39,6 +39,8 @@
 - `AvisoEstado.tsx`: los avisos de estado y bloqueo pasan a estar alineados a la izquierda (`w-full justify-start gap-3.5 px-5 py-3.5 text-left`), con el ícono centrado verticalmente, la etiqueta y el título `text-sm font-bold` en una línea y el subtítulo `text-xs text-muted`.
 - Inicio del docente (`DocenteDashboardView.tsx`): se quitó el chip «Tenés X observación(es)…» junto al saludo, porque la campana ya cumple esa función. Las etiquetas de conteo pasan a «Observaciones: X» en `StatusBadge` (propio y del prototipo), `DashboardKit`, `DocenteDashboardView`, `BadgeObservaciones` y el Header.
 - Notificaciones: títulos limpios sin el conteo («PAAC · Asignatura», «PAAD Anual 2026») en `lib/notificaciones.ts`. Las tarjetas del Header muestran el ícono a la izquierda, el título junto al estado y el punto de no leída en la fila 1, y los metadatos con «Observaciones: X» en ámbar en la fila 2.
+- Bandeja PAAC (`src/prototipo/components/views/PlanificacionesList.tsx`): columnas redistribuidas en `table-fixed` (20/7/6/16/11/11/11/9/9 = 100 %). Asignatura y Responsable admiten 2 líneas (`line-clamp-2`); Carrera y Ciclo van centradas; las celdas usan `px-4 py-3.5 align-middle`. La última columna se llama «Informes» y va centrada (`flex-wrap justify-center`), sin hueco a la derecha.
+- Bandeja PAAD (`PaadsListView.tsx`): anchos 24/30/18/16/12 = 100 % y la columna «Acciones» centrada.
 - README y `docs/DOCKER.md` actualizados con las cuentas de prueba; los comentarios de `ProtocolizacionModal` y `EquipoCatedraModal` ya no citan la Ord. 448/2011.
 
 
