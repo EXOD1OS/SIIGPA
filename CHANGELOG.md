@@ -2,6 +2,9 @@
 
 ## Pendiente de publicar
 
+- Manual de Usuario en `docs/manual/` (Markdown y Word editable) con 25 capturas reales en modo claro y oscuro. Las capturas se regeneran con `scripts/capturar-manual.mjs` (Playwright, solo lectura) y el `.docx` con `scripts/generar-manual-docx.mjs`.
+- Los modales ya no dejan una franja sin oscurecer en la parte superior de la pantalla cuando se abren dentro de una lista con espaciado vertical.
+
 - Identidad visual en verde institucional: favicon (`src/app/icon.svg`, convención de Next.js) y logos del menú lateral con fondo transparente (`logo-SIIGPA-sidebar.png`, su variante para modo oscuro y el isotipo `logo-SIIGPA.png`). El isotipo mantiene el mismo tamaño y posición al contraer o expandir el menú.
 
 - Se incorporó una instalación Docker portable para SIGA, con aplicación Next.js, PostgreSQL y migraciones automáticas.

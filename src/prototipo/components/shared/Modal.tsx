@@ -55,7 +55,8 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-16"
+      // `!m-0`: dentro de un contenedor `space-y-*` el backdrop recibía margin-top y dejaba una franja sin cubrir.
+      className="fixed inset-0 z-50 !m-0 flex items-start justify-center overflow-y-auto bg-black/60 p-4 pt-16"
       onClick={onClose}
     >
       <div
