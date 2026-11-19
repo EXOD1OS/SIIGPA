@@ -1,9 +1,0 @@
-node_modules/
-.next/
-.git/
-build/
-tests/
-*.tsbuildinfo
-config/minio/
-public/*.png
-context/_prototipo/

@@ -31,7 +31,7 @@ _prototipo/
 
 # archivos de de configuracion
 .claude/
-docs/
+.docs/
 .claudeignore
 .CLAUDE.md
-context/
+.context/
