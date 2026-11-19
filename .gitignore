@@ -26,4 +26,5 @@ desktop.ini
 Thumbs.db
 
 # Prototipos y diagramas locales de contexto
-context/_prototipo/
+context/
+_prototipo/

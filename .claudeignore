@@ -6,3 +6,4 @@ tests/
 *.tsbuildinfo
 config/minio/
 public/*.png
+context/_prototipo/

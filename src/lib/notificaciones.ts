@@ -33,10 +33,17 @@ export async function cargarNotificaciones(user: Usuario, ciclo: number): Promis
     out.push({ ...resto, id: `${clave}:${n.state}:${n.unresolvedCount}` });
   };
 
-  if (user.rol === UserRole.ADMINISTRADOR) return out;
+  // Ciclo: el Consejo protocoliza documentos de cualquier ciclo; Administración ve la revisión del ciclo
+  // y la protocolización pendiente de todos los ciclos; el resto, solo el ciclo vigente.
+  const porCiclo: Prisma.PlanificacionWhereInput =
+    user.rol === UserRole.CONSEJO_DEPARTAMENTAL
+      ? {}
+      : user.rol === UserRole.ADMINISTRADOR
+        ? { OR: [{ cicloLectivo: ciclo }, { estado: { in: ['APROBADO_PLENO', 'ELEVADO_AL_CONSEJO'] } }] }
+        : { cicloLectivo: ciclo };
 
   const planifs = await prisma.planificacion.findMany({
-    where: { AND: [planificacionesWherePara(user), user.rol === UserRole.CONSEJO_DEPARTAMENTAL ? {} : { cicloLectivo: ciclo }] },
+    where: { AND: [planificacionesWherePara(user), porCiclo] },
     include: includePlanif,
     orderBy: { updatedAt: 'desc' },
   });
@@ -74,6 +81,19 @@ export async function cargarNotificaciones(user: Usuario, ciclo: number): Promis
           add({ clave: `paac-res-${p.id}`, tipo: 'revision', href: '/planificaciones?state=ELEVADO_AL_CONSEJO', title: `PAAC · ${asig}`, subtitle: `${carrera} · Ciclo ${p.cicloLectivo} · Exp. ${p.numeroExpediente ?? '—'} · Pendiente de Resolución`, state: p.estado, unresolvedCount: 0 });
         }
         break;
+      // Administración: seguimiento de todo el circuito (una notificación por documento).
+      case UserRole.ADMINISTRADOR: {
+        const base = `${carrera} · Ciclo ${p.cicloLectivo}`;
+        if (enRevision && p.cicloLectivo === ciclo && (!d.pedApproved || !d.discApproved)) {
+          const falta = !d.pedApproved && !d.discApproved ? 'Pendiente de dictamen UAP y Disciplinar' : !d.pedApproved ? 'Pendiente de dictamen UAP' : 'Pendiente de dictamen Disciplinar';
+          add({ clave: `adm-rev-${p.id}`, tipo: 'revision', href, title: `PAAC · ${asig}`, subtitle: `${base} · ${falta}`, state: p.estado, unresolvedCount: 0 });
+        } else if (p.estado === 'APROBADO_PLENO') {
+          add({ clave: `adm-exp-${p.id}`, tipo: 'revision', href: '/planificaciones?state=APROBADO_PLENO', title: `PAAC · ${asig}`, subtitle: `${base} · Listo para cargar Expediente`, state: p.estado, unresolvedCount: 0 });
+        } else if (p.estado === 'ELEVADO_AL_CONSEJO') {
+          add({ clave: `adm-res-${p.id}`, tipo: 'revision', href: '/planificaciones?state=ELEVADO_AL_CONSEJO', title: `PAAC · ${asig}`, subtitle: `${base} · Exp. ${p.numeroExpediente ?? '—'} · Pendiente de Resolución`, state: p.estado, unresolvedCount: 0 });
+        }
+        break;
+      }
     }
   }
 
@@ -91,8 +111,18 @@ export async function cargarNotificaciones(user: Usuario, ciclo: number): Promis
         add({ clave: 'paad-borrador', tipo: 'info', href: '/mi-paad', title: `PAAD Anual ${ciclo}`, subtitle: `Ciclo ${ciclo} · Recordá completarlo y presentarlo`, state: paad.estado, unresolvedCount: 0 });
       }
     }
-  } else if (user.rol === UserRole.UAP || user.rol === UserRole.DIRECCION_CARRERA) {
+  } else if (user.rol === UserRole.UAP || user.rol === UserRole.DIRECCION_CARRERA || user.rol === UserRole.ADMINISTRADOR) {
     if (user.rol === UserRole.DIRECCION_CARRERA && !user.carreraId) return out;
+    // Administración: además, PAAD con copias anteriores distintas que debe unificar.
+    if (user.rol === UserRole.ADMINISTRADOR) {
+      const conflictos = await prisma.paadAnual.findMany({
+        where: { cicloLectivo: ciclo, conflictoMigracion: true },
+        select: { id: true, estado: true, docente: { select: { nombre: true, apellido: true } } },
+      });
+      for (const p of conflictos) {
+        add({ clave: `paad-conf-${p.id}`, tipo: 'warning', href: `/paads/${p.id}`, title: `PAAD Anual · ${p.docente.nombre} ${p.docente.apellido}`, subtitle: `Ciclo ${ciclo} · Copias anteriores distintas: elegir la fuente`, state: p.estado, unresolvedCount: 0 });
+      }
+    }
     const paads = await prisma.paadAnual.findMany({
       where: { cicloLectivo: ciclo, estado: 'ENVIADO_A_REVISION', conflictoMigracion: false, ...(user.rol === UserRole.DIRECCION_CARRERA ? { carreraEvaluadoraId: user.carreraId } : {}) },
       select: { id: true, estado: true, docente: { select: { nombre: true, apellido: true } }, carreraEvaluadora: { select: { codigo: true } } },

@@ -397,19 +397,20 @@ export function PlanificacionesList({
         {/* Tabla */}
         <div className="overflow-x-auto">
           {/* table-fixed + anchos por columna (suman 100%): los encabezados no se mueven al filtrar ni con 0 resultados. */}
-          <table className="w-full table-fixed min-w-[1360px] text-left border-collapse text-xs">
+          {/* min-w moderado: el scroll horizontal solo aparece con zoom o en pantallas angostas. */}
+          <table className="w-full table-fixed min-w-[860px] text-left border-collapse text-xs">
             <thead>
               <tr className="bg-background text-muted border-b border-border">
-                {/* 20 + 7 + 6 + 16 + 11 + 11 + 11 + 9 + 9 = 100 % */}
-                <th scope="col" className={`${thCls} w-[20%] px-4 sm:pl-5`}>Asignatura</th>
+                {/* 19 + 7 + 6 + 15 + 11 + 11 + 11 + 12 + 8 = 100 % */}
+                <th scope="col" className={`${thCls} w-[19%] px-4 sm:pl-5`}>Asignatura</th>
                 <th scope="col" className={`${thCls} w-[7%] text-center`}>Carrera</th>
                 <th scope="col" className={`${thCls} w-[6%] text-center`}>Ciclo</th>
-                <th scope="col" className={`${thCls} w-[16%] px-4`}>Responsable</th>
+                <th scope="col" className={`${thCls} w-[15%] px-4`}>Responsable</th>
                 <th scope="col" className={`${thCls} w-[11%] px-4`}>PAAC</th>
                 <th scope="col" className={`${thCls} w-[11%] px-4`}>Estado</th>
                 <th scope="col" className={`${thCls} w-[11%] px-4`}>Dictámenes</th>
-                <th scope="col" className={`${thCls} w-[9%] px-4`}>Expediente / Resolución</th>
-                <th scope="col" className={`${thCls} w-[9%] text-center`}>Informes</th>
+                <th scope="col" className={`${thCls} w-[12%] px-4`}>Expediente / Resolución</th>
+                <th scope="col" className={`${thCls} w-[8%] px-2 text-center`}>Informes</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -435,7 +436,7 @@ export function PlanificacionesList({
                     </td>
                     <td className="px-3 py-3.5 text-center align-middle tabular-nums text-ink">{d.cycle}</td>
                     <td className="min-w-0 px-4 py-3.5 align-middle text-ink">
-                      <span className="line-clamp-2 leading-snug" title={fullName(d.owner)}>
+                      <span className="block truncate" title={fullName(d.owner)}>
                         {fullName(d.owner)}
                       </span>
                     </td>
@@ -456,52 +457,52 @@ export function PlanificacionesList({
                         <DictamenChip area="Ped." value={dictamenDe(d.pedApproved, d.pedReport)} />
                       </div>
                     </td>
-                    <td className="min-w-0 px-4 py-3.5 align-middle">
-                      {d.expediente ? (
+                    {/* Protocolización (solo Consejo / Administración, que reciben `onProtocolizar`):
+                        1.ª instancia en APROBADO_PLENO, 2.ª en ELEVADO_AL_CONSEJO. */}
+                    <td className="min-w-0 overflow-hidden px-4 py-3.5 align-middle">
+                      {d.state === 'APROBADO_PLENO' && onProtocolizar ? (
+                        <BotonProtocolo compacto etapa="expediente" onClick={() => onProtocolizar(d.id)} />
+                      ) : d.state === 'ELEVADO_AL_CONSEJO' ? (
+                        <div className="flex min-w-0 flex-col items-start gap-1.5">
+                          <span className="block w-full truncate font-mono text-xs font-semibold text-ink" title={d.expediente}>
+                            {d.expediente || '—'}
+                          </span>
+                          {onProtocolizar ? (
+                            <BotonProtocolo compacto etapa="resolucion" onClick={() => onProtocolizar(d.id)} />
+                          ) : (
+                            <span className="block text-[11px] text-muted">Resolución pendiente</span>
+                          )}
+                        </div>
+                      ) : d.state === 'FINALIZADO' ? (
                         <div className="min-w-0 space-y-0.5">
                           <span className="block truncate font-mono text-xs font-semibold text-ink" title={d.expediente}>
                             {d.expediente}
                           </span>
-                          {d.state === 'FINALIZADO' ? (
-                            <span className="flex min-w-0 items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400" title={`Resolución ${d.resolucion} · documento cerrado`}>
-                              <IconLock className="h-3 w-3 shrink-0" />
-                              <span className="truncate font-mono">{d.resolucion}</span>
-                            </span>
-                          ) : (
-                            <span className="block text-[11px] text-muted">Resolución pendiente</span>
-                          )}
+                          <span className="flex min-w-0 items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400" title={`Resolución ${d.resolucion} · documento cerrado`}>
+                            <IconLock className="h-3 w-3 shrink-0" />
+                            <span className="truncate font-mono">{d.resolucion}</span>
+                          </span>
                         </div>
                       ) : (
                         <span className="text-muted">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-3.5 text-center align-middle sm:pr-4">
-                      {/* Con varios botones (Consejo: protocolo + Ver PAAC + Informes) se apilan centrados dentro del 9 %. */}
-                      <div className="flex flex-wrap items-center justify-center gap-2 whitespace-nowrap">
-                        {(() => {
-                          const etapa = onProtocolizar ? etapaProtocolo(d.state) : null;
-                          return etapa ? <BotonProtocolo etapa={etapa} onClick={() => onProtocolizar?.(d.id)} /> : null;
-                        })()}
-                        {d.state === 'FINALIZADO' && (
-                          <button type="button" onClick={() => onViewFinal(d.id)} className={BTN_FILA} title="Ver el documento final protocolizado">
-                            Ver PAAC
-                          </button>
-                        )}
-                        {/* Solo consulta: se habilita cuando hay al menos un informe emitido (dictamen favorable). */}
-                        <button
-                          type="button"
-                          onClick={() => setInformesId(d.id)}
-                          disabled={!d.pedApproved && !d.discApproved}
-                          aria-label={
-                            d.pedApproved || d.discApproved ? `Ver informes de ${ctx.asig?.nombre}` : `${ctx.asig?.nombre}: aún no hay informes emitidos`
-                          }
-                          title={d.pedApproved || d.discApproved ? undefined : 'Aún no hay informes emitidos'}
-                          className={BTN_FILA}
-                        >
-                          Informes
-                        </button>
-                      </div>
-                    </td>                  </tr>
+                    <td className="min-w-0 overflow-hidden px-2 py-3.5 text-center align-middle">
+                      {/* Solo consulta: se habilita cuando hay al menos un informe emitido (dictamen favorable). */}
+                      <button
+                        type="button"
+                        onClick={() => setInformesId(d.id)}
+                        disabled={!d.pedApproved && !d.discApproved}
+                        aria-label={
+                          d.pedApproved || d.discApproved ? `Ver informes de ${ctx.asig?.nombre}` : `${ctx.asig?.nombre}: aún no hay informes emitidos`
+                        }
+                        title={d.pedApproved || d.discApproved ? undefined : 'Aún no hay informes emitidos'}
+                        className={`${BTN_FILA} max-w-full !h-7 !px-2.5 !text-[11px]`}
+                      >
+                        Informes
+                      </button>
+                    </td>
+                  </tr>
                 );
               })}
               {filtradas.length === 0 && (

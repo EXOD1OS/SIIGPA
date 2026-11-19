@@ -55,20 +55,6 @@ export function SaludoDashboard({ nombre, subtitulo, extra }: { nombre: string; 
   );
 }
 
-/** Chip de acción rápida del encabezado (ámbar: requiere atención). */
-export function ChipAccion({ children, onClick }: { children: ReactNode; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-2 rounded-full border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-500/20 dark:text-amber-200 ${foco}`}
-    >
-      <IconAlert className="h-4 w-4" />
-      {children}
-      <IconArrowRight className="h-3.5 w-3.5" />
-    </button>
-  );
-}
 
 /** Pastillas de selección (alcance, ciclo). */
 export function Pastillas<T extends string>({

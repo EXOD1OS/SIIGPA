@@ -5,7 +5,6 @@ import { IconAlert, IconCheck, IconClock, IconDocs } from '@/components/layout/i
 import {
   COLOR,
   CareerComparisonMatrix,
-  ChipAccion,
   DonutChartCard,
   KpiFilterCard,
   MetricaBarra,
@@ -66,7 +65,6 @@ export function UapDashboardView({ datos, nav, subtitulo }: { datos: DatosDashbo
       <SaludoDashboard
         nombre={nombre}
         subtitulo={subtitulo ?? `Unidad de Asesoramiento Pedagógico (UAP) · Ciclo Lectivo ${ciclo}`}
-        extra={grupos.revision.length > 0 && <ChipAccion onClick={() => setFiltro('revision')}>{grupos.revision.length} PAAC(s) pendientes de dictamen UAP</ChipAccion>}
       />
 
       <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-12">

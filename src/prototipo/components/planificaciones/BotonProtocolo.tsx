@@ -16,6 +16,10 @@ export const IconCarpeta = ({ className = 'h-3.5 w-3.5' }: { className?: string 
 const BASE =
   'inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 text-xs font-semibold leading-none shadow-sm transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2';
 
+/** Variante de celda de tabla: nunca empuja el ancho de la columna (el texto se recorta si no entra). */
+const COMPACTO =
+  'inline-flex h-7 max-w-full min-w-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-lg border px-2.5 text-[11px] font-semibold leading-none shadow-sm transition-all duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2';
+
 const ESTILO: Record<EtapaProtocolo, string> = {
   expediente:
     'bg-indigo-600/15 hover:bg-indigo-600 text-indigo-700 dark:text-indigo-300 hover:text-white border-indigo-500/30 hover:border-indigo-600 focus-visible:outline-indigo-500',
@@ -41,22 +45,26 @@ export function BotonProtocolo({
   etapa,
   onClick,
   detenerPropagacion = false,
+  compacto = false,
   className = '',
 }: {
   etapa: EtapaProtocolo;
   onClick: () => void;
   /** Dentro de una tarjeta clickeable: no abre la tarjeta. */
   detenerPropagacion?: boolean;
+  /** Versión de celda de bandeja (h-7, text-[11px], sin desbordar la columna). */
+  compacto?: boolean;
   className?: string;
 }) {
   const manejar = (e: MouseEvent<HTMLButtonElement>) => {
     if (detenerPropagacion) e.stopPropagation();
     onClick();
   };
+  const icono = compacto ? 'h-3 w-3 shrink-0' : 'h-3.5 w-3.5 shrink-0';
   return (
-    <button type="button" onClick={manejar} className={`${BASE} ${ESTILO[etapa]} ${className}`}>
-      {etapa === 'expediente' ? <IconCarpeta className="h-3.5 w-3.5 shrink-0" /> : <IconSeal className="h-3.5 w-3.5 shrink-0" />}
-      {LABEL_PROTOCOLO[etapa]}
+    <button type="button" onClick={manejar} title={LABEL_PROTOCOLO[etapa]} className={`${compacto ? COMPACTO : BASE} ${ESTILO[etapa]} ${className}`}>
+      {etapa === 'expediente' ? <IconCarpeta className={icono} /> : <IconSeal className={icono} />}
+      <span className={compacto ? 'min-w-0 truncate' : undefined}>{LABEL_PROTOCOLO[etapa]}</span>
     </button>
   );
 }

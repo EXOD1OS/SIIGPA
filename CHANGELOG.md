@@ -41,6 +41,8 @@
 - Notificaciones: títulos limpios sin el conteo («PAAC · Asignatura», «PAAD Anual 2026») en `lib/notificaciones.ts`. Las tarjetas del Header muestran el ícono a la izquierda, el título junto al estado y el punto de no leída en la fila 1, y los metadatos con «Observaciones: X» en ámbar en la fila 2.
 - Bandeja PAAC (`src/prototipo/components/views/PlanificacionesList.tsx`): columnas redistribuidas en `table-fixed` (20/7/6/16/11/11/11/9/9 = 100 %). Asignatura y Responsable admiten 2 líneas (`line-clamp-2`); Carrera y Ciclo van centradas; las celdas usan `px-4 py-3.5 align-middle`. La última columna se llama «Informes» y va centrada (`flex-wrap justify-center`), sin hueco a la derecha.
 - Bandeja PAAD (`PaadsListView.tsx`): anchos 24/30/18/16/12 = 100 % y la columna «Acciones» centrada.
+- Bandeja PAAC: «Cargar Expediente» y «Cargar Resolución» pasan a la columna «Expediente / Resolución» (variante `compacto` de `BotonProtocolo`, solo Consejo y Administración). «Informes» queda sola en su columna y se quitó el «Ver PAAC» duplicado. Anchos 19/7/6/15/11/11/11/12/8 = 100 % y `min-w-[860px]` (antes 1360 px): sin scroll horizontal a tamaño normal.
+- Dashboards: se quitó el chip «X PAAC(s) pendientes de dictamen UAP» (`ChipAccion`, eliminado de `DashboardKit`). `lib/notificaciones.ts` agrega la campana de Administración: PAAC sin dictamen UAP o Disciplinar del ciclo, PAAC para cargar expediente o resolución (de cualquier ciclo), PAAD en revisión y PAAD con conflicto de migración.
 - README y `docs/DOCKER.md` actualizados con las cuentas de prueba; los comentarios de `ProtocolizacionModal` y `EquipoCatedraModal` ya no citan la Ord. 448/2011.
 
 
