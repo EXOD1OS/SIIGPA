@@ -28,3 +28,10 @@ Thumbs.db
 # Prototipos y diagramas locales de contexto
 context/
 _prototipo/
+
+# archivos de de configuracion
+.claude/
+docs/
+.claudeignore
+.CLAUDE.md
+context/
