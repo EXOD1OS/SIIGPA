@@ -33,5 +33,6 @@ _prototipo/
 .claude/
 .docs/
 .claudeignore
-.CLAUDE.md
-.context/
+CLAUDE.md
+context/
+docs/
