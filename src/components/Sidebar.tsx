@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState, type ComponentType, type SVGProps } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAppSelector } from '@/redux/hooks';
@@ -76,14 +77,22 @@ export function Sidebar({ rol }: { rol: string }) {
         collapsed ? 'md:w-[72px]' : 'md:w-64'
       }`}
     >
-      {/* Marca */}
-      <div className="flex h-16 items-center gap-3 border-b border-border px-[18px]">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary font-serif text-lg font-bold text-white shadow-sm">S</div>
-        <div className={fade(collapsed)}>
-          <span className="block text-base font-bold leading-tight tracking-tight text-ink">SIIGPA</span>
-          <span className="text-[10px] uppercase tracking-wider text-muted">Gestión de Planes · UNLaR</span>
-        </div>
-      </div>
+      {/* Marca. El isotipo mide 40 px de alto en ambos estados y queda a 16 px del borde (72 px contraído = 16 + 40 + 16):
+          al expandir/contraer solo aparece o desaparece el texto, sin saltos. Fondo transparente en ambos modos. */}
+      <Link href="/dashboard" aria-label="SIIGPA · UNLaR — Panel de Inicio" className="flex h-16 items-center overflow-hidden border-b border-border px-4 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary">
+        <span className={`shrink-0 ${collapsed ? 'md:hidden' : ''}`}>
+          <Image src="/logo-SIIGPA-sidebar.png" alt="SIIGPA UNLaR" width={660} height={176} priority className="block h-10 w-auto max-w-[180px] object-contain dark:hidden" />
+          <Image src="/logo-SIIGPA-sidebar-dark.png" alt="SIIGPA UNLaR" width={660} height={176} priority className="hidden h-10 w-auto max-w-[180px] object-contain dark:block" />
+        </span>
+        <Image
+          src="/logo-SIIGPA.png"
+          alt="SIIGPA"
+          width={176}
+          height={176}
+          priority
+          className={`hidden h-10 w-10 shrink-0 rounded-xl object-contain ${collapsed ? 'md:block' : ''}`}
+        />
+      </Link>
 
       {/* Botón contraer / expandir (escritorio) */}
       <button
